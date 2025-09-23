@@ -1,0 +1,36 @@
+# Bytecode & Cache
+__pycache__/
+*.py[cod]
+
+# Virtuelle Umgebung
+venv/
+
+# VS Code Einstellungen
+.vscode/
+
+# OS-spezifisch
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Sensible Daten
+*.env
+
+# Sonstiges
+*.xopp
+
+# CSV-Datei ignorieren
+Neuses.csv
+Neuses_mit_CN_Bilder.csv
+Neuses_mit_Lorem_Bilder.csv
+corpus_nummorum.csv
+corpus_nummorum_lorem.csv
+bild_test.csv
+cn_thumbnails.csv
+la_catillon
+test_muenzen_100_max_edges.csv
+test_muenzen_200_max_edges.csv
+assets
+cn_thumbnails_100_test.csv
