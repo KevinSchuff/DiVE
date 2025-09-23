@@ -32,5 +32,7 @@ cn_thumbnails.csv
 la_catillon
 test_muenzen_100_max_edges.csv
 test_muenzen_200_max_edges.csv
-assets
 cn_thumbnails_100_test.csv
+
+assets/*
+!assets/.gitkeep
