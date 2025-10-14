@@ -31,6 +31,10 @@ Windows: `.\venv\Scripts\activate`
 
 ## Test Application
 
+### Open in the browser
+
+`http://127.0.0.1:8050/`
+
 ### Click Choose CSV
 
 ### Select in the project Directory 'test.csv'
