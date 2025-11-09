@@ -12,6 +12,13 @@ _css_esc = str.maketrans({"\\": r"\\\\", '"': r"\\\"", "'": r"\\'", "]": r"\\]",
 def css_escape(s: str) -> str:
     return str(s).translate(_css_esc)
 
+def remove_duplicate_dies(dies):
+    seen = {}
+    for die in dies:
+        key = (str(die.get("id")), die.get("typ"))
+        seen[key] = {"id": key[0], "typ": key[1]}
+    return list(seen.values())
+
 def add_edges_by_mode(G: nx.Graph, front_key: str, back_key: str, mode: str = 'both'):
     """
     Add edges in coinview based on matching dies and depending on selected edge mode.
@@ -39,31 +46,37 @@ def add_edges_by_mode(G: nx.Graph, front_key: str, back_key: str, mode: str = 'b
             elif mode == 'both' and front_u and back_u and front_u == front_v and back_u == back_v:
                 G.add_edge(u_id, v_id, attr='same_front_back')
 
-def create_dies_graph(coin_graph, front_col, back_col, front_url_col=None, back_url_col=None):
+def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden_dies=None, front_url_col=None, back_url_col=None):
     """
-    Build the die-view graph (one node per die). 
-    - For image fields:
-        * Absolute URLs -> proxified via /img_proxy
-        * Relative paths -> served from /assets/...
+    Build die-graph skipping over hidden coins and dies.
     """
     die_graph = nx.Graph()
+    skip_coins = set(hidden_coins or [])
+    skip_dies = set(hidden_dies)
     # go through all nodes in coin_graph
     for node_id, data in coin_graph.nodes(data=True):
+        # ignore hidden coins
+        if node_id in skip_coins:
+            continue
         coin_id = str(node_id)
         front_die = data.get(front_col)
         back_die = data.get(back_col)
         # add coin's back die, to die graph
-        if front_die:
-            if front_die not in die_graph:
-                die_graph.add_node(front_die, typ=front_col, coin_ids=set())
-            die_graph.nodes[front_die]["coin_ids"].add(coin_id)
-            # assign image once if available
-            if front_url_col and data.get(front_url_col) and "bg_url" not in die_graph.nodes[front_die]:
-                bg = bg_url_from_csv_value(data.get(front_url_col))
-                if bg:
-                    die_graph.nodes[front_die]["bg_url"] = bg
-        # add coin's back die to die grpah
-        if back_die:
+        skip_front_die = (not front_die) or (front_die in skip_dies) 
+        skip_back_die = (not back_die) or (back_die in skip_dies) 
+
+        if not skip_front_die:
+            if front_die not in skip_dies:
+                if front_die not in die_graph:
+                    die_graph.add_node(front_die, typ=front_col, coin_ids=set())
+                die_graph.nodes[front_die]["coin_ids"].add(coin_id)
+                # assign image once if available
+                if front_url_col and data.get(front_url_col) and "bg_url" not in die_graph.nodes[front_die]:
+                    bg = bg_url_from_csv_value(data.get(front_url_col))
+                    if bg:
+                        die_graph.nodes[front_die]["bg_url"] = bg
+        # add coin's back die to die graph
+        if not skip_back_die:
             if back_die not in die_graph:
                 die_graph.add_node(back_die, typ=back_col, coin_ids=set())
             die_graph.nodes[back_die]["coin_ids"].add(coin_id)
@@ -74,14 +87,16 @@ def create_dies_graph(coin_graph, front_col, back_col, front_url_col=None, back_
                     die_graph.nodes[back_die]["bg_url"] = bg
 
         # connect front <-> back with weight
-        if front_die and back_die:
+        if not skip_front_die and not skip_back_die:
             if die_graph.has_edge(front_die, back_die):
                 die_graph[front_die][back_die]['weight'] += 1
             else:
                 die_graph.add_edge(front_die, back_die, weight=1)
 
     for n in die_graph.nodes:
-        die_graph.nodes[n]["coin_ids"] = sorted(die_graph.nodes[n]["coin_ids"])
+        ids = sorted(str(x) for x in die_graph.nodes[n]["coin_ids"])
+        die_graph.nodes[n]["coin_ids"] = ids
+        die_graph.nodes[n]["coin_ids_string"] = "," + ",".join(sorted(ids)) + ","
 
     return die_graph
 
@@ -99,6 +114,45 @@ def nx_to_elements(G: nx.Graph):
             e['data']['weight'] = ed['weight']
         elements.append(e)
     return elements
+
+def cyto_elements_to_nx(elements, exclude_hidden):
+    """
+    converts cyto elements list to networkX graph
+    """
+
+    graph = nx.Graph()
+    # collect hidden nodes
+    hidden_nodes = set()
+    if exclude_hidden:
+        for ele in elements:
+            # check that element is node
+            if "data" in ele and "id" in ele["data"]:
+                # check for hidden node specific styling
+                if ele.get("style", {}).get("display") == "none":
+                    hidden_nodes.add(str(ele["data"]["id"]))
+
+    # add visible nodes and skip hidden nodes
+    for ele in elements:
+        data = ele.get("data", {})
+        # check that element is node
+        if "id" in data:
+            node_id = str(data["id"])
+            if node_id not in hidden_nodes:
+                graph.add_node(node_id)
+    
+    # add edges
+    for ele in elements:
+        data = ele.get("data", {})
+        if "source" in data and "target" in data:
+            u = str(data["source"])
+            v = str(data["target"])
+            # skip if one node of edge is hidden
+            if u in hidden_nodes or v in hidden_nodes:
+                continue
+            graph.add_edge(u, v)
+
+    return graph
+
 
 def base_stylesheet_dies():
     return [
@@ -129,7 +183,8 @@ def base_stylesheet_dies():
                 'text-background-opacity': 0.5,
                 'text-background-shape': 'round-rectangle'
             }
-        }
+        },
+        {'selector': ':selected', 'style': {'border-width': 5, "background-color": "#999"}},     # change styling of node selection
     ]
 
 
@@ -140,6 +195,7 @@ def base_stylesheet_coins(edge_mode='front'):
     styles = [
         {'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200,'border-width': 2,}},
         {'selector': 'edge', 'style': {'line-color': 'black', 'line-opacity': 0.5}},
+        {'selector': ':selected', 'style': {'border-width': 5, "background-color": "#999"}},     # change styling of node selection
     ]
 
     # Common visual for image nodes
@@ -169,11 +225,36 @@ def base_stylesheet_coins(edge_mode='front'):
     return styles
 
 
-def color_and_filter_rules(color_values_list, color_ids, filter_store):
+def set_hiding_rules(filter_store, skip_coins, skip_dies):
+    """
+    Helper to build cytoscape stylesheet rules for hiding specific nodes
+    """
+    hiding_rules = []
+
+    # hide nodes based on selection
+    for node_id in skip_coins:
+        hiding_rules.append({'selector': f"node[id='{css_escape(node_id)}']", 'style': {'display': 'none'}})
+    for die in skip_dies:
+        die_id = die.get("id")
+        die_typ = die.get("typ")
+        hiding_rules.append({'selector': f"node[{css_escape(die_typ)}='{css_escape(die_id)}']", 'style': {'display': 'none'}})
+
+    # hide nodes based on attributes
+    if isinstance(filter_store, dict):
+        for attr, values in filter_store.items():
+            for val in values or []:
+                hiding_rules.append({
+                    'selector': f"node[{attr}='{css_escape(val)}']",
+                    'style': {'display': 'none'}
+                })
+
+    return hiding_rules
+
+def set_color_rules(color_values_list, color_ids):
     """
     Helper to build cytoscape stylesheet rules
     """
-    rules = []
+    color_rules = []
     # color rules (attr names are normalized; values may have spaces/umlauts)
     for color_values, id_ in zip(color_values_list or [], color_ids or []):
         color = id_.get('index') if isinstance(id_, dict) else None
@@ -184,26 +265,18 @@ def color_and_filter_rules(color_values_list, color_ids, filter_store):
             if isinstance(cond, str) and '=' in cond:
                 attr, val = cond.split('=', 1)   # attr is normalized
                 selector += f"[{attr}='{css_escape(val)}']"
-        rules.append({
+        color_rules.append({
             'selector': selector,
-            'style': {'border-color': color, 'border-width': 3, 'border-style': 'solid'}
+            'style': {'border-color': color,}
         })
 
-    # hide rules (attr names normalized)
-    if isinstance(filter_store, dict):
-        for attr, values in filter_store.items():
-            for val in values or []:
-                rules.append({
-                    'selector': f"node[{attr}='{css_escape(val)}']",
-                    'style': {'display': 'none'}
-                })
-    return rules
+    return color_rules
 
 def build_layout(name: str):
     # https://js.cytoscape.org/#layouts
     # Link to extra layouts https://dash.plotly.com/cytoscape/layout
-    layout = {'name': name, 'fit': True, 'padding': 30}
-
+    layout = {'name': name,'fit': True,'padding': 30,}
+        
     if name == 'concentric':
         layout.update({'minNodeSpacing': 30})
 
@@ -214,7 +287,7 @@ def build_layout(name: str):
         layout.update({'avoidOverlap': True})
 
     elif name == 'cose':
-        layout.update({})
+        layout.update({'randomize': False})
 
     elif name == 'cose-bilkent':
         layout.update({
@@ -628,7 +701,7 @@ def register_callbacks(app):
 
         # build die-graph with input columns
         dies_graph = create_dies_graph(
-            G, front_col=front_key, back_col=back_key,
+            G, front_col=front_key, back_col=back_key, hidden_coins=[], hidden_dies=[],
             front_url_col=front_url_key, back_url_col=back_url_key
             )
 
@@ -660,13 +733,14 @@ def register_callbacks(app):
             return {**base, 'display': 'none'}, {**base, 'display': 'block'}
         return {**base, 'display': 'block'}, {**base, 'display': 'none'}
 
-
-
-
     @app.callback(
         Output('cy-coins', 'stylesheet'),
         Output('cy-dies', 'stylesheet'),
         Output('stats-box', 'children'),
+        Output('cy-dies', 'elements', allow_duplicate=True),
+        Output('hidden-store', 'data'),
+        Input('hide-selection-button', 'n_clicks'),
+        Input('unhide-selection-button', 'n_clicks'),
         Input('graph-view-selector', 'value'),
         Input({'type': 'color-dropdown', 'index': ALL}, 'value'),
         Input('filter-values-store', 'data'),
@@ -676,52 +750,83 @@ def register_callbacks(app):
         State('graph-store-dies', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
+        State('front-column-url', 'value'),
+        State('back-column-url', 'value'),
+        State('cy-coins', 'selectedNodeData'),
+        State('cy-dies', 'selectedNodeData'),
+        State('hidden-store', 'data'),
+        State('cy-dies', 'elements'),
+        prevent_initial_call=True
     )
-    def update_styles_and_stats(view, color_values_list, filter_store, edge_mode, color_ids,
-                                graph_data_coins, graph_data_dies, col_front, col_back):
+    def update_styles_and_stats(hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, color_ids,
+                                graph_data_coins, graph_data_dies, col_front, col_back, col_front_url, col_back_url, selected_nodes_coins, selected_nodes_dies, hidden, dies_elements_current):
         """
         Updates stylesheets and stat box on change of view, color , filter or edge mode selection
         """
         if not graph_data_coins:
-            return no_update, no_update, no_update
-        # build stylesheet rules for both views
-        stylesheet_common = color_and_filter_rules(color_values_list, color_ids, filter_store)
-
-        # append basestylesheets
-        ss_coins = base_stylesheet_coins(edge_mode) + stylesheet_common
-        ss_dies = base_stylesheet_dies() + stylesheet_common
-
-        # --- Stats (exact, computed in Python; does not change elements) ---
+            return no_update, no_update, no_update, no_update, no_update
+        
         G_coins_full = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
+        # prepare column names
+        front_key = normalize_key(col_front or "Stempeluntergruppe Av")
+        back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
+        front_url_key = normalize_key(col_front_url or "Vorderseite Bild")
+        back_url_key = normalize_key(col_back_url or "Rueckseite Bild")
 
-        # Apply filters to compute visible coins
-        hidden = set()
+        # apply attribute based filter
+        hide_nodes_attr = set()
         if filter_store:
             for attr, values in filter_store.items():
                 for n, d in G_coins_full.nodes(data=True):
                     if attr in d and str(d[attr]) in values:
-                        hidden.add(n)
-        visible_coins = [n for n in G_coins_full.nodes if n not in hidden]
+                        hide_nodes_attr.add(n)
+        visible_coins = [n for n in G_coins_full.nodes if n not in hide_nodes_attr]
         G_coins_visible = G_coins_full.subgraph(visible_coins).copy()
-        count_coins = G_coins_visible.number_of_nodes()
+        
+        # get stored hidden coin ids and dies
+        hidden_store = hidden or {}
+        hidden_store_coins = hidden_store.get("coins", []) # list of coin ids (str)
+        hidden_store_dies = hidden_store.get("dies", [])  # list of die obj like {"id":, .., "typ":, ...,}
 
-        front_key = normalize_key(col_front or "Stempeluntergruppe Av")
-        back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
+        # Decide what coins/dies to hide
+        # Case1: "Unhide Selection" was clicked -> reset everything that is selection-based
+        if ctx.triggered_id == "unhide-selection-button":
+            all_hidden_coins_ids = set()
+            all_hidden_dies_objs = []
+        # Case2: "Hide Selection" was clicked -> extend hidden stores with current selection
+        elif ctx.triggered_id == "hide-selection-button":
+            # add current selection of current view to hidden store
+            if view == 'coins':
+                selection_ids = [str(d["id"]) for d in (selected_nodes_coins or []) if isinstance(d, dict) and "id" in d]
+                all_hidden_coins_ids = set(hidden_store_coins + selection_ids) #make to list?
+                all_hidden_dies_objs = hidden_store_dies
+            else: 
+                selection_dies = [{"id": str(d["id"]), "typ": d.get("typ")} for d in (selected_nodes_dies or [])if isinstance(d, dict) and "id" in d]
+                all_hidden_dies_objs = remove_duplicate_dies(hidden_store_dies + selection_dies)
+                all_hidden_coins_ids = set(hidden_store_coins) #make to list?
+        # Case3: view change, attribute filter, colors or edgemode triggered the callback -> use only hidden store 
+        else:
+            all_hidden_coins_ids = set(hidden_store_coins)
+            all_hidden_dies_objs = hidden_store_dies
+        
+        # rebuild die-graph without hidden coins/dies (attribute based filtering + selection based)
+        all_hidden_dies_ids = [d["id"] for d in all_hidden_dies_objs]
+        updated_die_graph = create_dies_graph(G_coins_visible, front_key, back_key, all_hidden_coins_ids, all_hidden_dies_ids, front_url_key, back_url_key)
 
+        # build stylesheet rules for both views
+        color_rules = set_color_rules(color_values_list, color_ids)
+        hiding_rules = set_hiding_rules(filter_store, all_hidden_coins_ids, all_hidden_dies_objs)
+        # append basestylesheets
+        ss_coins = base_stylesheet_coins(edge_mode) + color_rules + hiding_rules
+        ss_dies = base_stylesheet_dies() + color_rules + hiding_rules
+
+        # compute stats
+        count_coins = G_coins_visible.number_of_nodes() - len(all_hidden_coins_ids)
+        count_dies = updated_die_graph.number_of_nodes()
         if view == 'coins':
-            vis_nodes_data = list(G_coins_visible.nodes(data=True))
-            all_dies = (
-                {str(d.get(front_key)) for _, d in vis_nodes_data if d.get(front_key)}
-                | {str(d.get(back_key)) for _, d in vis_nodes_data if d.get(back_key)}
-            )
-            dies_visible = len(all_dies)
             components = nx.number_connected_components(G_coins_visible) if count_coins else 0
         else:
-        # CHANGE: this should be changed so if coin nodes get filtered, the corresponding die should be filtered aswell?
-        # currently creates seperate die graph only for stats
-            die_graph = create_dies_graph(G_coins_visible, front_col=front_key, back_col=back_key)
-            dies_visible = die_graph.number_of_nodes()
-            components = nx.number_connected_components(die_graph) if dies_visible else 0
+            components = nx.number_connected_components(updated_die_graph) if count_dies else 0
 
         def _stats_list(items):
             return html.Ul([html.Li(it) for it in items], style={'margin': 0, 'paddingLeft': '18px'})
@@ -729,12 +834,41 @@ def register_callbacks(app):
         stats_children = html.Div([
             _stats_list([
                 f"Coins: {count_coins}",
-                f"Dies: {dies_visible}",
+                f"Dies: {count_dies}",
                 f"Connected components: {components}",
             ])
         ])
 
-        return ss_coins, ss_dies, stats_children
+        # update hidden store
+        hidden_out = no_update
+        if ctx.triggered_id == 'hide-selection-button':
+            hidden_out = {
+                "coins": sorted(all_hidden_coins_ids),
+                "dies": all_hidden_dies_objs,
+            }
+        elif ctx.triggered_id == 'unhide-selection-button':
+            hidden_out = {
+            "coins": [],
+            "dies": [],
+            }
+        
+                # --- Decide whether to actually update cy-dies.elements ---
+        trigger = ctx.triggered_id
+
+        structural_triggers = (
+            'hide-selection-button',
+            'unhide-selection-button',
+            'filter-values-store',
+        )
+        update_die_elements = trigger in structural_triggers
+        
+
+        if update_die_elements:
+            die_elements_out = nx_to_elements(updated_die_graph)
+        else:
+            die_elements_out = no_update
+
+        return ss_coins, ss_dies, stats_children, nx_to_elements(updated_die_graph), hidden_out
 
     @app.callback(
         Output('lightbox', 'style'),
@@ -817,30 +951,53 @@ def register_callbacks(app):
             html.Ul(items, style={'margin': 0, 'paddingLeft': '18px'})
         ])
 
+    @app.callback(
+        Output("unhide-selection-button", "disabled"),
+        Input("hidden-store", "data"),
+    )
+    def toggle_unhide_button(hidden_store):
+        # no store -> keep disabled
+        if not hidden_store or not isinstance(hidden_store, dict):
+            return True
 
-
+        # check if hidden store is empty
+        coins = hidden_store.get("coins", [])
+        dies = hidden_store.get("dies", [])
+        if bool(coins) or bool(dies):
+            return False
+        else:
+            return True
 
 
     @app.callback(
         Output('cy-coins', 'layout'),
         Output('cy-dies', 'layout'),
-        Output('dies-force-grid-once', 'data'),
         Input('layout-selector', 'value'),
-        Input('graph-view-selector', 'value'),
-        Input('dies-force-grid-once', 'data'),
+        State('graph-view-selector', 'value'),
+        State('auto-layout-toggle', 'value'),
+        prevent_initial_call=True
     )
-    def set_layout(selected, active_view, force_once):
-        layout = build_layout(selected)
-        # fix for die-view not having a layout applied on first switch
-        if active_view == 'dies' and force_once==True:
-            # add same for switched cases
-            time.sleep(1)
-            return no_update, layout, False
+    def set_layout(selected_layout, active_view, auto_layout_toggle):
 
+        auto_enabled = 'on' in (auto_layout_toggle or [])
+        layout = build_layout(selected_layout)
+
+        # If auto-layout is off, only change layout on layout-selector
+        if not auto_enabled:
+            if ctx.triggered_id == 'layout-selector':
+                        if active_view == 'coins':
+                            return layout, no_update
+                        elif active_view == 'dies':
+                            return no_update, layout
+            else:
+                return no_update, no_update
+        
+        # Apply layout only to the currently active view
         if active_view == 'coins':
-            return layout, no_update, force_once
+            return layout, no_update
         else:
-            return no_update, layout, force_once
+            return no_update, layout
+
 
     @app.callback(
         Output('cy-coins', 'generateImage'),
@@ -868,3 +1025,13 @@ def register_callbacks(app):
                 'scale': 1,
                 'bg': 'white'
             }, no_update
+
+    @app.callback(
+        Output('cy-coins', 'autoRefreshLayout'),
+        Output('cy-dies', 'autoRefreshLayout'),
+        Input('auto-layout-toggle', 'value'),
+        prevent_initial_call=False
+    )
+    def set_auto_layout(toggle_value):
+        on = 'on' in (toggle_value or [])
+        return on, on

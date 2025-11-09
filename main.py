@@ -56,6 +56,10 @@ app.layout = html.Div([
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id='elements-coins-base'),   # base elements (no bg_* fields)
     dcc.Store(id='dies-force-grid-once', data=True),
+    dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
+    dcc.Store(id="layout-trigger"),
+
+
 
 
     # User Inputs for Column names
@@ -126,6 +130,9 @@ app.layout = html.Div([
     html.Div(id='zip-status', style={'marginLeft': '10px'}),
 
     html.Button("Export as PNG", id='export-png-button', n_clicks=0, style={'margin': '10px'}),
+    html.Button("Hide Selection", id='hide-selection-button', n_clicks=0, style={'margin': '10px'}),
+    html.Button("Unhide Selection", id="unhide-selection-button", n_clicks=0, disabled=True, style={'margin': '10px'}),
+    html.Button("Show only Selection", id='show-only-selection-button', n_clicks=0, style={'margin': '10px'}),
 ], style={'display': 'flex', 'alignItems': 'center'}),
     html.Hr(),
 
@@ -192,6 +199,13 @@ app.layout = html.Div([
                 clearable=False,
                 style={'marginBottom': '10px'}
             ),
+            dcc.Checklist(
+                id='auto-layout-toggle',
+                options=[{'label': 'Auto layout', 'value': 'on'}],
+                value=['on'],
+                inline=True,
+                style={'marginBottom': '10px'}
+            ),
             html.Hr(),
             # Color Nodes
             html.H3("Color nodes by attribute value"),
@@ -239,7 +253,7 @@ app.layout = html.Div([
                     'backgroundColor': '#f9f9f9',
                     'marginTop': '6px'
                 }
-            ),            
+            ),
             ], style={'flex': '1', 'padding': '10px', 'maxWidth': '400px', 'overflowY': 'auto'}),
 
         # Graphs
@@ -248,17 +262,21 @@ app.layout = html.Div([
             cyto.Cytoscape(
             id='cy-coins',
             layout={'name': 'grid'},
+            autoRefreshLayout = False,  # disables applying layout on elements change
             style={'width': '100%', 'height': '800px', 'display': 'block'},
             elements=[],
             stylesheet=[{'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200, 'border-width': 2}}],
+            boxSelectionEnabled = True,
             wheelSensitivity=0.1,
             ),
             cyto.Cytoscape(
             id='cy-dies',
             layout={'name': 'grid'},
+            autoRefreshLayout = False,
             style={'width': '100%', 'height': '800px', 'display': 'none'},
             elements=[],
             stylesheet=[{'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200, 'border-width': 2}}],
+            boxSelectionEnabled = True,
             wheelSensitivity=0.1,
             ),
         ], style={'flex': '3', 'padding': '10px'})
