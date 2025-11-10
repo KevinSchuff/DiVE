@@ -739,8 +739,9 @@ def register_callbacks(app):
         Output('stats-box', 'children'),
         Output('cy-dies', 'elements', allow_duplicate=True),
         Output('hidden-store', 'data'),
+        Input('show-only-selection-button', 'n_clicks'),
         Input('hide-selection-button', 'n_clicks'),
-        Input('unhide-selection-button', 'n_clicks'),
+        Input('reset-selection-button', 'n_clicks'),
         Input('graph-view-selector', 'value'),
         Input({'type': 'color-dropdown', 'index': ALL}, 'value'),
         Input('filter-values-store', 'data'),
@@ -758,7 +759,7 @@ def register_callbacks(app):
         State('cy-dies', 'elements'),
         prevent_initial_call=True
     )
-    def update_styles_and_stats(hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, color_ids,
+    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, color_ids,
                                 graph_data_coins, graph_data_dies, col_front, col_back, col_front_url, col_back_url, selected_nodes_coins, selected_nodes_dies, hidden, dies_elements_current):
         """
         Updates stylesheets and stat box on change of view, color , filter or edge mode selection
@@ -790,7 +791,7 @@ def register_callbacks(app):
 
         # Decide what coins/dies to hide
         # Case1: "Unhide Selection" was clicked -> reset everything that is selection-based
-        if ctx.triggered_id == "unhide-selection-button":
+        if ctx.triggered_id == "reset-selection-button":
             all_hidden_coins_ids = set()
             all_hidden_dies_objs = []
         # Case2: "Hide Selection" was clicked -> extend hidden stores with current selection
@@ -804,6 +805,36 @@ def register_callbacks(app):
                 selection_dies = [{"id": str(d["id"]), "typ": d.get("typ")} for d in (selected_nodes_dies or [])if isinstance(d, dict) and "id" in d]
                 all_hidden_dies_objs = remove_duplicate_dies(hidden_store_dies + selection_dies)
                 all_hidden_coins_ids = set(hidden_store_coins) #make to list?
+        # Case3: "Show only Selection" was clicked -> extend hidden stores with everything but the current selection
+        elif ctx.triggered_id == "show-only-selection-button":
+            if view == 'coins':
+                # nodes currently visible after attribute-based filter
+                visible_coin_ids = {str(n) for n in G_coins_visible.nodes}
+                selection_ids = {str(d["id"]) for d in (selected_nodes_coins or []) if isinstance(d, dict) and "id" in d}
+                not_selected_coins = visible_coin_ids - selection_ids
+                # set union of store and not selected coins
+                all_hidden_coins_ids = set(hidden_store_coins) | not_selected_coins
+                all_hidden_dies_objs = hidden_store_dies
+            else:
+                # get die ids from current selection
+                visible_die_ids = {
+                    str(el.get("data", {}).get("id")) 
+                    for el in (dies_elements_current or [])
+                        if "id" in el.get("data", {})   # check if element is node
+                    }
+                selection_ids = {str(d["id"]) for d in (selected_nodes_dies or []) if isinstance(d, dict) and "id" in d}
+                not_selected_dies_ids = visible_die_ids - selection_ids
+                # convert to dies obj with id and typ
+                new_hidden_dies_obj = []
+                # get not selected dies typ
+                for el in (dies_elements_current or []):
+                    if "id" in el.get("data", {}):
+                        data = el.get("data", {})
+                        node_id = str(data.get("id"))
+                        if node_id in not_selected_dies_ids:
+                            new_hidden_dies_obj.append({"id": node_id, "typ": data.get("typ")})
+                all_hidden_dies_objs = remove_duplicate_dies(hidden_store_dies + new_hidden_dies_obj)
+                all_hidden_coins_ids = set(hidden_store_coins)
         # Case3: view change, attribute filter, colors or edgemode triggered the callback -> use only hidden store 
         else:
             all_hidden_coins_ids = set(hidden_store_coins)
@@ -841,12 +872,12 @@ def register_callbacks(app):
 
         # update hidden store
         hidden_out = no_update
-        if ctx.triggered_id == 'hide-selection-button':
+        if ctx.triggered_id in ('hide-selection-button', 'show-only-selection-button'):
             hidden_out = {
                 "coins": sorted(all_hidden_coins_ids),
                 "dies": all_hidden_dies_objs,
             }
-        elif ctx.triggered_id == 'unhide-selection-button':
+        elif ctx.triggered_id == 'reset-selection-button':
             hidden_out = {
             "coins": [],
             "dies": [],
@@ -857,7 +888,7 @@ def register_callbacks(app):
 
         structural_triggers = (
             'hide-selection-button',
-            'unhide-selection-button',
+            'reset-selection-button',
             'filter-values-store',
         )
         update_die_elements = trigger in structural_triggers
@@ -952,7 +983,7 @@ def register_callbacks(app):
         ])
 
     @app.callback(
-        Output("unhide-selection-button", "disabled"),
+        Output("reset-selection-button", "disabled"),
         Input("hidden-store", "data"),
     )
     def toggle_unhide_button(hidden_store):

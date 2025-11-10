@@ -131,8 +131,8 @@ app.layout = html.Div([
 
     html.Button("Export as PNG", id='export-png-button', n_clicks=0, style={'margin': '10px'}),
     html.Button("Hide Selection", id='hide-selection-button', n_clicks=0, style={'margin': '10px'}),
-    html.Button("Unhide Selection", id="unhide-selection-button", n_clicks=0, disabled=True, style={'margin': '10px'}),
     html.Button("Show only Selection", id='show-only-selection-button', n_clicks=0, style={'margin': '10px'}),
+    html.Button("Reset Selection", id="reset-selection-button", n_clicks=0, disabled=True, style={'margin': '10px'}),
 ], style={'display': 'flex', 'alignItems': 'center'}),
     html.Hr(),
 
