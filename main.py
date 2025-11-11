@@ -98,20 +98,7 @@ app.layout = html.Div([
 ], style={'margin': '10px 0'}),
 
 
-    # Edge-Condition
-    html.Div([
-        html.Label("Edge condition (Coin-View):", style={'marginRight': '10px'}),
-        dcc.RadioItems(
-            id='edge-mode',
-            options=[
-                {'label': 'Front', 'value': 'front'},
-                {'label': 'Back', 'value': 'back'},
-                {'label': 'Front + Back', 'value': 'both'}
-            ],
-            value='front',
-            inline=True
-        )
-    ], style={'display': 'flex', 'alignItems': 'center'}),
+
 
 
     # Upload CSV/ZIP, export buttons
@@ -148,7 +135,7 @@ app.layout = html.Div([
         ],
         value='coins',
         inline=True
-    )
+    ),
 ], style={'display': 'flex', 'alignItems': 'center'}),
 
 
@@ -207,26 +194,67 @@ app.layout = html.Div([
                 style={'marginBottom': '10px'}
             ),
             html.Hr(),
-            # Color Nodes
-            html.H3("Color nodes by attribute value"),
-            html.Label("Red:"),
-            dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'red'}, multi=True, searchable=True),
-            html.Label("Blue:"),
-            dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'blue'}, multi=True, searchable=True),
-            html.Label("Green:"),
-            dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'green'}, multi=True, searchable=True),
-            html.H4("Add custom colors"),
+
             html.Div([
-                dcc.Input(
-                    id='new-color-input',
-                    type='text',
-                    placeholder='Color name or #hexcode',
-                    debounce=True,
-                    style={'width': '70%', 'marginRight': '10px'}
+                html.H3("Edge options"),
+                html.Div(
+                    id='scale-weighted-edges-container',
+                    children=[
+                        dcc.Checklist(
+                            id='scale-weighted-edges',
+                            options=[{'label': 'scale edges with weight', 'value': 'on'}],
+                            value=['on'],
+                            inline=True,
+                            style={'marginBottom': '10px'}
+                        ),
+                    ],
                 ),
-                html.Button('+', id='add-color-button', n_clicks=0),
-            ], style={'marginBottom': '15px'}),
-            html.Div(id='custom-color-dropdowns'),
+                html.Div(
+                    id='edge-mode-container',
+                    children=[
+                        html.Div([
+                            html.Label("Edge condition:", style={'marginRight': '10px'}),
+                            dcc.RadioItems(
+                                id='edge-mode',
+                                options=[
+                                    {'label': 'Front', 'value': 'front'},
+                                    {'label': 'Back', 'value': 'back'},
+                                    {'label': 'Front + Back', 'value': 'both'}
+                                ],
+                                value='front',
+                                inline=True
+                            )
+                        ], style={'display': 'flex', 'alignItems': 'center'}),
+                    ]
+                ),
+            ]),
+            
+            html.Div(
+                id='color-nodes-container',
+                children=[
+                    html.Hr(),
+                    # Color Nodes
+                    html.H3("Color nodes by attribute value"),
+                    html.Label("Red:"),
+                    dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'red'}, multi=True, searchable=True),
+                    html.Label("Blue:"),
+                    dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'blue'}, multi=True, searchable=True),
+                    html.Label("Green:"),
+                    dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'green'}, multi=True, searchable=True),
+                    html.H4("Add custom colors"),
+                    html.Div([
+                        dcc.Input(
+                            id='new-color-input',
+                            type='text',
+                            placeholder='Color name or #hexcode',
+                            debounce=True,
+                            style={'width': '70%', 'marginRight': '10px'}
+                        ),
+                        html.Button('+', id='add-color-button', n_clicks=0),
+                    ], style={'marginBottom': '15px'}),
+                    html.Div(id='custom-color-dropdowns'),
+                ],
+            ),
 
             html.Hr(),
             html.H3("Hide Nodes"),

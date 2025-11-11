@@ -53,6 +53,7 @@ def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden
     die_graph = nx.Graph()
     skip_coins = set(hidden_coins or [])
     skip_dies = set(hidden_dies)
+    max_edge_weight = 0
     # go through all nodes in coin_graph
     for node_id, data in coin_graph.nodes(data=True):
         # ignore hidden coins
@@ -92,13 +93,16 @@ def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden
                 die_graph[front_die][back_die]['weight'] += 1
             else:
                 die_graph.add_edge(front_die, back_die, weight=1)
+            # update max edge weight
+            if die_graph[front_die][back_die]['weight'] > max_edge_weight:
+                max_edge_weight = die_graph[front_die][back_die]['weight']
 
     for n in die_graph.nodes:
         ids = sorted(str(x) for x in die_graph.nodes[n]["coin_ids"])
         die_graph.nodes[n]["coin_ids"] = ids
         die_graph.nodes[n]["coin_ids_string"] = "," + ",".join(sorted(ids)) + ","
 
-    return die_graph
+    return die_graph, max_edge_weight
 
 
 def nx_to_elements(G: nx.Graph):
@@ -154,8 +158,8 @@ def cyto_elements_to_nx(elements, exclude_hidden):
     return graph
 
 
-def base_stylesheet_dies():
-    return [
+def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
+    stylesheet = [
         {'selector': 'node', 'style': {'label': 'data(label)'}},
         {
             'selector': 'edge',
@@ -165,8 +169,8 @@ def base_stylesheet_dies():
                 'min-zoomed-font-size': 8,
                 'text-rotation': 'autorotate',
                 'line-color': 'black',
-                'line-opacity': 0.7,
-                'text-margin-y': -10
+                'text-margin-y': -10,
+                'width': 2,
             }
         },
         {
@@ -186,6 +190,16 @@ def base_stylesheet_dies():
         },
         {'selector': ':selected', 'style': {'border-width': 5, "background-color": "#999"}},     # change styling of node selection
     ]
+
+    if scale_edges_weight:
+        stylesheet.append({
+            'selector': 'edge',
+            'style': {
+                'width': f'mapData(weight, 0, {max_edge_weight}, 1, 20)'
+            }
+        })
+
+    return stylesheet
 
 
 def base_stylesheet_coins(edge_mode='front'):
@@ -700,7 +714,7 @@ def register_callbacks(app):
         options = [{'label': c, 'value': c} for c in sorted(combinations)]
 
         # build die-graph with input columns
-        dies_graph = create_dies_graph(
+        dies_graph, _ = create_dies_graph(
             G, front_col=front_key, back_col=back_key, hidden_coins=[], hidden_dies=[],
             front_url_col=front_url_key, back_url_col=back_url_key
             )
@@ -725,13 +739,17 @@ def register_callbacks(app):
     @app.callback(
         Output('cy-coins', 'style'),
         Output('cy-dies', 'style'),
+        Output('scale-weighted-edges-container', 'style'),
+        Output('edge-mode-container', 'style'),
+        Output('color-nodes-container', 'style'),
         Input('graph-view-selector', 'value'),
         )
     def toggle_visible_view(view):
         base = {'width': '100%', 'height': '800px'}
         if view == 'dies':
-            return {**base, 'display': 'none'}, {**base, 'display': 'block'}
-        return {**base, 'display': 'block'}, {**base, 'display': 'none'}
+            return {**base, 'display': 'none'}, {**base, 'display': 'block'}, {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+        else:
+            return {**base, 'display': 'block'}, {**base, 'display': 'none'}, {'display': 'none'}, {'display': 'block'}, {'display': 'block'}
 
     @app.callback(
         Output('cy-coins', 'stylesheet'),
@@ -746,6 +764,7 @@ def register_callbacks(app):
         Input({'type': 'color-dropdown', 'index': ALL}, 'value'),
         Input('filter-values-store', 'data'),
         Input('edge-mode', 'value'),
+        Input('scale-weighted-edges', 'value'),
         State({'type': 'color-dropdown', 'index': ALL}, 'id'),
         State('graph-store-coins', 'data'),
         State('graph-store-dies', 'data'),
@@ -756,11 +775,12 @@ def register_callbacks(app):
         State('cy-coins', 'selectedNodeData'),
         State('cy-dies', 'selectedNodeData'),
         State('hidden-store', 'data'),
-        State('cy-dies', 'elements'),
+        State('cy-dies', 'elements'),    
         prevent_initial_call=True
     )
-    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, color_ids,
-                                graph_data_coins, graph_data_dies, col_front, col_back, col_front_url, col_back_url, selected_nodes_coins, selected_nodes_dies, hidden, dies_elements_current):
+    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, scale_weighted_edges, color_ids,
+                                graph_data_coins, graph_data_dies, col_front, col_back, col_front_url, col_back_url, selected_nodes_coins,
+                                selected_nodes_dies, hidden, dies_elements_current):
         """
         Updates stylesheets and stat box on change of view, color , filter or edge mode selection
         """
@@ -842,14 +862,17 @@ def register_callbacks(app):
         
         # rebuild die-graph without hidden coins/dies (attribute based filtering + selection based)
         all_hidden_dies_ids = [d["id"] for d in all_hidden_dies_objs]
-        updated_die_graph = create_dies_graph(G_coins_visible, front_key, back_key, all_hidden_coins_ids, all_hidden_dies_ids, front_url_key, back_url_key)
+        updated_die_graph, biggest_edge_weight = create_dies_graph(G_coins_visible, front_key, back_key, all_hidden_coins_ids, all_hidden_dies_ids, front_url_key, back_url_key)
 
         # build stylesheet rules for both views
         color_rules = set_color_rules(color_values_list, color_ids)
         hiding_rules = set_hiding_rules(filter_store, all_hidden_coins_ids, all_hidden_dies_objs)
         # append basestylesheets
         ss_coins = base_stylesheet_coins(edge_mode) + color_rules + hiding_rules
-        ss_dies = base_stylesheet_dies() + color_rules + hiding_rules
+        if 'on' in scale_weighted_edges:
+            ss_dies = base_stylesheet_dies(True, biggest_edge_weight) + color_rules + hiding_rules
+        else:
+            ss_dies = base_stylesheet_dies(False) + color_rules + hiding_rules
 
         # compute stats
         count_coins = G_coins_visible.number_of_nodes() - len(all_hidden_coins_ids)
