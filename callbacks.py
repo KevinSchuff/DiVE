@@ -40,11 +40,11 @@ def add_edges_by_mode(G: nx.Graph, front_key: str, back_key: str, mode: str = 'b
             back_v = str(v_dict.get(back_key, "")).strip()
 
             if mode == 'front' and front_u and front_u == front_v:
-                G.add_edge(u_id, v_id, attr='same_front')
+                G.add_edge(u_id, v_id, attr='same_front', label=front_u)
             elif mode == 'back' and back_u and back_u == back_v:
-                G.add_edge(u_id, v_id, attr='same_back')
+                G.add_edge(u_id, v_id, attr='same_back', label=back_u)
             elif mode == 'both' and front_u and back_u and front_u == front_v and back_u == back_v:
-                G.add_edge(u_id, v_id, attr='same_front_back')
+                G.add_edge(u_id, v_id, attr='same_front_back', label=(front_u + '/' + back_v))
 
 def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden_dies=None, front_url_col=None, back_url_col=None):
     """
@@ -110,13 +110,21 @@ def nx_to_elements(G: nx.Graph):
     Convert NetworkX graph into dash cytoscape elements list
     """
     elements = []
-    for n, d in G.nodes(data=True):
-        elements.append({'data': {'id': str(n), 'label': str(n), **d}})
-    for u, v, ed in G.edges(data=True):
-        e = {'data': {'source': str(u), 'target': str(v)}}
-        if 'weight' in ed:
-            e['data']['weight'] = ed['weight']
-        elements.append(e)
+    # add all nodes with attributes to elements
+    for node_id, node_attributes in G.nodes(data=True):
+        node_data = {"id": str(node_id), "label": str(node_id),}
+        # add all other node attributes
+        for attribute_name, attribute_value in node_attributes.items():
+            node_data[str(attribute_name)] = attribute_value
+        elements.append({"data": node_data})
+    # add all edges with attributes to elements
+    for u, v, edge_attributes in G.edges(data=True):
+        edge_data = {'source': str(u), 'target': str(v)}
+        # add all other edge attributes
+        for attribute_name, attribute_value in edge_attributes.items():
+            edge_data[str(attribute_name)] = attribute_value
+        elements.append({"data": edge_data})
+
     return elements
 
 def cyto_elements_to_nx(elements, exclude_hidden):
@@ -171,6 +179,7 @@ def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
                 'line-color': 'black',
                 'text-margin-y': -10,
                 'width': 2,
+                'border-color': 'black'
             }
         },
         {
@@ -181,14 +190,13 @@ def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
                 'background-opacity': 1,
                 'width': 200,
                 'height': 200,
-                'border-width': 2,
-                'border-color': '#444',
+                'border-width': 4,
                 'text-background-color': '#ffffff',
                 'text-background-opacity': 0.5,
                 'text-background-shape': 'round-rectangle'
             }
         },
-        {'selector': ':selected', 'style': {'border-width': 5, "background-color": "#999"}},     # change styling of node selection
+        {'selector': ':selected', 'style': {'border-width': 8, "background-color": "#999"}},     # change styling of node selection
     ]
 
     if scale_edges_weight:
@@ -207,9 +215,20 @@ def base_stylesheet_coins(edge_mode='front'):
     Build the Cytoscape stylesheet for the coin-view.
     """
     styles = [
-        {'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200,'border-width': 2,}},
-        {'selector': 'edge', 'style': {'line-color': 'black', 'line-opacity': 0.5}},
-        {'selector': ':selected', 'style': {'border-width': 5, "background-color": "#999"}},     # change styling of node selection
+        {'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200,'border-width': 4, 'border-color': 'black'}},
+        {
+            'selector': 'edge',
+            'style': {
+                'label': 'data(label)',
+                'font-size': 12,
+                'min-zoomed-font-size': 8,
+                'text-rotation': 'autorotate',
+                'line-color': 'black',
+                'text-margin-y': -10,
+                'width': 2,
+            }
+        },
+        {'selector': ':selected', 'style': {'border-width': 8, "background-color": "#999"}},     # change styling of node selection
     ]
 
     # Common visual for image nodes
@@ -1066,18 +1085,22 @@ def register_callbacks(app):
                 'type': 'png',
                 'action': 'download',
                 'filename': 'diesgraph_view',
+                'options': {          
                 'full': False,
-                'scale': 1,
-                'bg': 'white'
+                'scale': 4,
+                'bg': 'white',
+            }
             }
         else:
             return {
                 'type': 'png',
                 'action': 'download',
                 'filename': 'coingraph_view',
+                'options': {          
                 'full': False,
-                'scale': 1,
-                'bg': 'white'
+                'scale': 4,
+                'bg': 'white',
+            }
             }, no_update
 
     @app.callback(
