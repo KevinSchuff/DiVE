@@ -2,7 +2,7 @@ from dash import Input, Output, State, ctx, no_update, ALL, dcc, html
 import networkx as nx
 import base64, csv, io, time
 from urllib.parse import urlencode
-
+from uuid import uuid4
 from CSVHandler import load_graph_from_csv, normalize_key
 from image_utils import bg_url_from_csv_value
 
@@ -72,20 +72,20 @@ def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden
                     die_graph.add_node(front_die, typ=front_col, coin_ids=set())
                 die_graph.nodes[front_die]["coin_ids"].add(coin_id)
                 # assign image once if available
-                if front_url_col and data.get(front_url_col) and "bg_url" not in die_graph.nodes[front_die]:
+                if front_url_col and data.get(front_url_col) and "bg_die" not in die_graph.nodes[front_die]:
                     bg = bg_url_from_csv_value(data.get(front_url_col))
                     if bg:
-                        die_graph.nodes[front_die]["bg_url"] = bg
+                        die_graph.nodes[front_die]["bg_die"] = bg
         # add coin's back die to die graph
         if not skip_back_die:
             if back_die not in die_graph:
                 die_graph.add_node(back_die, typ=back_col, coin_ids=set())
             die_graph.nodes[back_die]["coin_ids"].add(coin_id)
             # assign image once if available
-            if back_url_col and data.get(back_url_col) and "bg_url" not in die_graph.nodes[back_die]:
+            if back_url_col and data.get(back_url_col) and "bg_die" not in die_graph.nodes[back_die]:
                 bg = bg_url_from_csv_value(data.get(back_url_col))
                 if bg:
-                    die_graph.nodes[back_die]["bg_url"] = bg
+                    die_graph.nodes[back_die]["bg_die"] = bg
 
         # connect front <-> back with weight
         if not skip_front_die and not skip_back_die:
@@ -183,9 +183,9 @@ def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
             }
         },
         {
-            'selector': 'node[bg_url]', # nur wenn es eine bg_url gibt
+            'selector': 'node[bg_die]', # nur wenn es eine bg_die gibt
             'style': {
-                'background-image': 'data(bg_url)',
+                'background-image': 'data(bg_die)',
                 'background-fit': 'cover',
                 'background-opacity': 1,
                 'width': 200,
@@ -945,51 +945,99 @@ def register_callbacks(app):
 
     @app.callback(
         Output('lightbox', 'style'),
-        Output('lightbox-img', 'src'),
+        Output('lightbox-body', 'children'),
         Input('cy-coins', 'tapNodeData'),
         Input('cy-dies', 'tapNodeData'),
         Input('lightbox-close', 'n_clicks'),
         State('edge-mode', 'value'),
         prevent_initial_call=True
     )
-    def open_lightbox_on_left_click(data_m, data_s, close_clicks, edge_mode):
-        # Close button clicked -> hide overlay
-        if ctx.triggered_id == 'lightbox-close':
-            return {'display': 'none'}, no_update
+    def lightbox(coin_data, die_data, close_clicks, edge_mode):
+        trigger = ctx.triggered_id
+        url = None
+        base_style={
+        'position': 'fixed', 'inset': 0,
+        'background': 'rgba(0,0,0,0.6)',
+        'zIndex': 9999, 'justifyContent': 'center', 'alignItems': 'center',
+        'padding': '24px', 'display': 'none'
+        }
 
-        # Which Cytoscape fired
-        data = data_m or data_s
+        # Close button clicked -> hide overlay
+        if trigger == 'lightbox-close':
+            return {'display': 'none'}, []
+
+        # set data based on what instance triggered callback
+        data = coin_data if trigger == 'cy-coins' else die_data
         if not data:
-            return {'display': 'none'}, no_update
+            return {'display': 'none'}, []
+
+        # only in die data
+        if 'bg_die' in data:
+            url = data.get('bg_die')
+        
+        elif edge_mode == 'front' or edge_mode == 'back':
+            url = data.get(f'bg_{edge_mode}')        
+        
+        else:  # edgemode both
+            front_url= data.get('bg_front')
+            back_url = data.get('bg_back')
+            # show both pictures if available
+            if front_url and back_url:
+                children = html.Div(
+                    [
+                        html.Img(
+                            src=front_url,
+                            style={'maxWidth': '45vw', 'maxHeight': '90vh', 'objectFit': 'contain'},
+                            key=str(uuid4())
+                        ) if front_url else html.Div(),
+                        html.Img(
+                            src=back_url,
+                            style={'maxWidth': '45vw', 'maxHeight': '90vh', 'objectFit': 'contain'},
+                            key=str(uuid4())
+                        ) if back_url else html.Div(),
+                    ],
+                )
+                style = dict(base_style, display='flex')
+                return style, [children]
+            # fallback on front or back image
+            elif front_url:
+                url = front_url
+            elif back_url:
+                url = back_url
+            else:
+                return {'display': 'none'}, []
+            
+        # only one picture to display
+        if not url:
+            return {'display': 'none'}, []
+        img = html.Img(
+            src=url,
+            style={'maxWidth': '90vw', 'maxHeight': '90vh', 'objectFit': 'contain'},
+            key=str(uuid4())
+        )
+        style = dict(base_style, display='flex')
+        return style, [img]
+
+        
 
         # Decide which image URL to show
-        url = None
-        if 'bg_url' in data:  # die-view node
-            url = data.get('bg_url')
-        elif edge_mode == 'front':
-            url = data.get('bg_front')
-        elif edge_mode == 'back':
-            url = data.get('bg_back')
-        else:  # both
-            f= data.get('bg_front')
-            b = data.get('bg_back')
-            if f and b:
-                # instead of just getting the bg_split, we create a higher resolution picture
-                url = f"/merge_split?{urlencode({'w': 1000, 'h': 1000, 'front': f, 'back': b})}"
-            else:
-                url = f or b
+        
+        
 
+        # node has no img 
         if not url:
-            return {'display': 'none'}, no_update
+            return {'display': 'none'}, []
+        
+        # build new img each time
+        new_img = html.Img(
+            src=url,
+            style={'maxWidth': '90vw', 'maxHeight': '90vh'},
+            key=str(uuid4())  # ensures react remounts image element
+        )
+        
+        style['display'] = 'flex'
 
-        overlay_style = {
-            'display': 'flex',
-            'position': 'fixed', 'inset': 0,
-            'background': 'rgba(0,0,0,0.6)',
-            'zIndex': 9999, 'justifyContent': 'center', 'alignItems': 'center',
-            'padding': '24px'
-        }
-        return overlay_style, url
+        return style, [new_img]
 
 
     @app.callback(
@@ -1012,7 +1060,7 @@ def register_callbacks(app):
 
         label = data.get('label', 'untitled')
         # only show attributes in the csv
-        skip_keys = {'id', 'label', 'bg_front', 'bg_back', 'bg_split', 'timeStamp', 'bg_url'}
+        skip_keys = {'id', 'label', 'bg_front', 'bg_back', 'bg_split', 'timeStamp', 'bg_die'}
         items = []
         for k, v in data.items():
             if k in skip_keys:

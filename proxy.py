@@ -2,14 +2,9 @@ import requests
 from flask import request, Response, abort
 from urllib.parse import urlsplit, quote
 
-# Image server does not allow you to embed its images directly
-# Only these hosts allowed
-ALLOWED_IMG_HOSTS = {
-    "data.corpus-nummorum.eu",
-    "picsum.photos",
-    # CHANGE : other hosts should be automatically added
-}
-
+# Whitelist hosts
+ALLOWED_IMG_HOSTS = None
+# max image size 8 MB
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 10
@@ -21,16 +16,17 @@ def register_image_proxy(flask_app):
         url = request.args.get("url", "")
         if not url:
             abort(400, "missing url")
-
+        # allow only http(s) urls
         parsed = urlsplit(url)
         if parsed.scheme not in ("http", "https"):
             abort(400, "invalid scheme")
-
+        # extract hostname
         host = parsed.netloc.split("@")[-1].split(":")[0].lower()
-        if host not in ALLOWED_IMG_HOSTS:
+        if ALLOWED_IMG_HOSTS is not None and host not in ALLOWED_IMG_HOSTS:
             abort(403, "host not allowed")
 
         try:
+            # get img request
             r = requests.get(
                 url, stream=True, allow_redirects=True,
                 timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)
@@ -38,20 +34,23 @@ def register_image_proxy(flask_app):
         except requests.RequestException as e:
             abort(502, f"fetch error: {e}")
 
+        # only continue if request worked
         if r.status_code != 200:
             abort(r.status_code)
 
+        # make sure it is an image
         ct = (r.headers.get("Content-Type") or "").lower()
         if not ct.startswith("image/"):
             abort(415, "unsupported media type")
 
+        # read image date in chucks (avoids large memory use) 
         data = b""
         total = 0
         for chunk in r.iter_content(64 * 1024):
             if not chunk:
                 continue
             total += len(chunk)
-            if total > MAX_IMAGE_BYTES:
+            if total > MAX_IMAGE_BYTES:     # max 8 MP pictures
                 abort(413, "image too large")
             data += chunk
 
@@ -60,5 +59,5 @@ def register_image_proxy(flask_app):
         return resp
 
 def proxify(url: str) -> str:
-    """Generates a local proxy URL for an image"""
+    """Generates a local proxy URL for an image to bypass CORS restrictions(websites not allowing their images to be shown directly on other sites)"""
     return f"/img_proxy?url={quote(url, safe=':/%?&=')}"

@@ -155,11 +155,9 @@ app.layout = html.Div([
                 "✕", id='lightbox-close', n_clicks=0,
                 style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px'}
             ),
-            html.Img(
-                id='lightbox-img',
-                style={'maxWidth': '90vw', 'maxHeight': '90vh'}
-            ),
-        ], style={'position': 'relative', 'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})
+            html.Div(id='lightbox-body', style={'position':'relative', 'display':'flex',
+                                            'flexDirection':'column', 'alignItems':'center'})
+        ])
     ),
 
 
