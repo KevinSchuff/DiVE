@@ -591,6 +591,7 @@ def register_callbacks(app):
             header = next(reader, None)
             n_rows = sum(1 for _ in reader)
 
+            # if uploaded csv too big, stash csv and show dialogue box
             if n_rows <= 100:
                 return contents, None, False
             else:
@@ -794,7 +795,7 @@ def register_callbacks(app):
         State('cy-coins', 'selectedNodeData'),
         State('cy-dies', 'selectedNodeData'),
         State('hidden-store', 'data'),
-        State('cy-dies', 'elements'),    
+        State('cy-dies', 'elements'),   
         prevent_initial_call=True
     )
     def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, scale_weighted_edges, color_ids,
@@ -1018,27 +1019,6 @@ def register_callbacks(app):
         style = dict(base_style, display='flex')
         return style, [img]
 
-        
-
-        # Decide which image URL to show
-        
-        
-
-        # node has no img 
-        if not url:
-            return {'display': 'none'}, []
-        
-        # build new img each time
-        new_img = html.Img(
-            src=url,
-            style={'maxWidth': '90vw', 'maxHeight': '90vh'},
-            key=str(uuid4())  # ensures react remounts image element
-        )
-        
-        style['display'] = 'flex'
-
-        return style, [new_img]
-
 
     @app.callback(
         Output('node-info-box', 'children'),
@@ -1060,7 +1040,7 @@ def register_callbacks(app):
 
         label = data.get('label', 'untitled')
         # only show attributes in the csv
-        skip_keys = {'id', 'label', 'bg_front', 'bg_back', 'bg_split', 'timeStamp', 'bg_die'}
+        skip_keys = {'id', 'label', 'bg_front', 'bg_back', 'bg_split', 'timeStamp', 'bg_die', 'coin_ids_string'}
         items = []
         for k, v in data.items():
             if k in skip_keys:
@@ -1160,3 +1140,14 @@ def register_callbacks(app):
     def set_auto_layout(toggle_value):
         on = 'on' in (toggle_value or [])
         return on, on
+    
+    @app.callback(
+        Output('start-app-overlay', 'style'),
+        Input('upload-data', 'contents'),
+        prevent_initial_call=False
+    )
+    def close_start_app_overlay(upload_data):
+        if upload_data is not None:
+            return {'display': 'none'}
+        else:
+            return no_update

@@ -24,7 +24,7 @@ server = app.server
 register_merge_route(server)
 register_image_proxy(server)
 
-app.title = "Network visualization"
+app.title = "DiVE"
 
 # In-memory store for images from the ZIP
 #ZIP_IMAGE_STORE = {}
@@ -55,71 +55,102 @@ app.layout = html.Div([
     dcc.Store(id='pending-csv', data=None),
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id='elements-coins-base'),   # base elements (no bg_* fields)
-    dcc.Store(id='dies-force-grid-once', data=True),
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
-    dcc.Store(id="layout-trigger"),
 
 
 
 
-    # User Inputs for Column names
-    html.Div([
-        html.Label("Front column:"),
-        dcc.Input(
-            id='front-column',
-            type='text',
-            placeholder='Stempeluntergruppe Av',
-            debounce=True,
-            style={'marginRight': '10px'}
+
+    html.Div(
+        id='start-app-overlay',
+        style={
+            'position': 'fixed',
+            'inset': 0,
+            'backgroundColor': 'rgba(0,0,0,0.6)',
+            'zIndex': 10000,
+            'display': 'flex',
+            'justifyContent': 'center',
+            'alignItems': 'center',
+            'padding': '24px'
+        },
+        children=html.Div(
+            style={
+                'backgroundColor': 'white',
+                'padding': '24px',
+                'maxWidth': '600px',
+                'width': '100%',
+            },
+            children=[
+                html.H1("Welcome to DiVE"),
+                html.H3("DieLink Visualization Environment"),
+                html.H4("Please enter the corresponding field names and choose a CSV"),
+
+                # User Inputs for Column names
+                html.Div([
+                    html.Div([
+                        html.Label("Front column:"),
+                        dcc.Input(
+                            id='front-column',
+                            type='text',
+                            placeholder='Stempeluntergruppe Av',
+                            debounce=True,
+                            style={'width': '100%'}
+                        ),
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Label("Back column:"),
+                        dcc.Input(
+                            id='back-column',
+                            type='text',
+                            placeholder='Stempeluntergruppe Rv',
+                            debounce=True,
+                            style={'width': '100%'}
+                        ),
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Label("Front img:"),
+                        dcc.Input(
+                            id='front-column-url',
+                            type='text',
+                            placeholder='Vorderseite Bild',
+                            debounce=True,
+                            style={'width': '100%'}
+                        ),
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Label("Back img:"),
+                        dcc.Input(
+                            id='back-column-url',
+                            type='text',
+                            placeholder='Rückseite Bild',
+                            debounce=True,
+                            style={'width': '100%'}
+                        ),
+                    ], style={'marginBottom': '10px'}),
+                ], style={'marginTop': '10px'}),
+
+                html.Div([
+                    dcc.Upload(
+                        id='upload-data',
+                        children=html.Button("Choose CSV", style={'margin': '10px'}),
+                        multiple=False
+                    ),
+                ], style={'textAlign': 'center', 'marginTop': '20px'}),
+
+            ]
         ),
-        html.Label("Back column:"),
-        dcc.Input(
-            id='back-column',
-            type='text',
-            placeholder='Stempeluntergruppe Rv',
-            debounce=True,
-            style={'marginRight': '10px'}
-        ),
-        html.Label("Front img:"),
-        dcc.Input(
-            id='front-column-url',
-            type='text',
-            placeholder='Vorderseite Bild',
-            debounce=True,
-            style={'marginRight': '10px'}
-        ),
-        html.Label("Back img:"),
-        dcc.Input(
-            id='back-column-url',
-            type='text',
-            placeholder='Rückseite Bild',
-            debounce=True
-        ),
-], style={'margin': '10px 0'}),
-
-
-
-
-
-    # Upload CSV/ZIP, export buttons
-    html.Div([
-    dcc.Upload(
-        id='upload-data',
-        children=html.Button("Choose CSV", style={'margin': '10px'}),
-        multiple=False
     ),
-    # out of comission
-    dcc.Upload(
-        id='upload-zip',
-        children=html.Button("Choose ZIP", style={'margin': '10px'}),
-        multiple=False
-    ),
-    html.Div(id='zip-status', style={'marginLeft': '10px'}),
 
-    html.Button("Export as PNG", id='export-png-button', n_clicks=0, style={'margin': '10px'}),
-    html.Button("Hide Selection", id='hide-selection-button', n_clicks=0, style={'margin': '10px'}),
-    html.Button("Show only Selection", id='show-only-selection-button', n_clicks=0, style={'margin': '10px'}),
-    html.Button("Reset Selection", id="reset-selection-button", n_clicks=0, disabled=True, style={'margin': '10px'}),
+
+
+
+
+    # Selection buttons
+    html.Div([
+    html.Button("Hide Selection", id='hide-selection-button', title='hides all selected nodes',  n_clicks=0, style={'margin': '10px'}),
+    html.Button("Show only Selection", id='show-only-selection-button', title='hides all nodes not in selection', n_clicks=0, style={'margin': '10px'}),
+    html.Button("Reset Selection", id="reset-selection-button", title='resets selection based hiding', n_clicks=0, disabled=True, style={'margin': '10px'}),
+    html.Label("Box selection: shift + left-click + drag"),
 ], style={'display': 'flex', 'alignItems': 'center'}),
     html.Hr(),
 
@@ -280,7 +311,20 @@ app.layout = html.Div([
                     'marginTop': '6px'
                 }
             ),
+            html.Div(
+                id='export-container',
+                children=[
+                    html.Hr(),
+                    html.H3("Export"),
+                    html.Button("Export as PNG", id='export-png-button', n_clicks=0),
+                ],
+            ),
+
             ], style={'flex': '1', 'padding': '10px', 'maxWidth': '400px', 'overflowY': 'auto'}),
+
+
+
+            
 
         # Graphs
         html.Div([
