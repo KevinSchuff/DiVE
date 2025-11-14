@@ -3,6 +3,14 @@ import networkx as nx
 import io
 import unicodedata
 import re
+import io, os, requests
+import numpy as np
+import cv2
+from urllib.parse import urlparse, parse_qs, unquote
+from flask import Response, request
+from functools import lru_cache
+from proxy import proxify
+import re
 
 def normalize_key(s: str) -> str:
     if s is None:
@@ -73,3 +81,21 @@ def load_graph_from_csv(csv_path_or_buffer, node_id_col=None):
     G.graph['key_map'] = key_map
     G.graph['inv_key_map'] = inv_map
     return G
+
+# check if string looks like url
+def is_url(s: str) -> bool:
+    return bool(re.match(r'^[a-zA-Z][a-zA-Z0-9+.\-]*://', s)) or s.startswith("data:")
+
+# normalizes file path string
+def norm_path(p: str) -> str:
+    return p.replace("\\", "/").lstrip("./")
+
+def bg_url_from_csv_value(raw_val: str):
+    if not raw_val:
+        return None
+    s = str(raw_val).strip()
+    if not s:
+        return None
+    if is_url(s):
+        return proxify(s)               # external URL through Proxy
+    return "/assets/" + norm_path(s)    # relative paths in assets

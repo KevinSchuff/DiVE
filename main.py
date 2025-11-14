@@ -1,4 +1,3 @@
-from proxy import register_image_proxy, proxify
 import dash
 from dash import dcc, html, Input, Output, State, ctx, no_update, ALL
 import dash_cytoscape as cyto
@@ -12,9 +11,10 @@ import csv
 import mimetypes
 from flask import Response, abort 
 from urllib.parse import quote, urlencode
-from image_utils import bg_url_from_csv_value, register_merge_route
-import time
-from callbacks import register_callbacks
+from image_utils import register_merge_route
+from proxy import register_image_proxy
+from update_view_callbacks import register_update_view_callbacks
+from ui_elements_callbacks import register_ui_elements_callbacks
 
 cyto.load_extra_layouts()
 
@@ -26,22 +26,6 @@ register_image_proxy(server)
 
 app.title = "DiVE"
 
-# In-memory store for images from the ZIP
-#ZIP_IMAGE_STORE = {}
-
-
-
-"""
-# Flask route to serve images from the ZIP
-@server.route("/zipimg/<path:filename>")
-def serve_zip_image(filename):
-    key = norm_path(filename)
-    if key not in ZIP_IMAGE_STORE:
-        abort(404)
-    data = ZIP_IMAGE_STORE[key]
-    mime = mimetypes.guess_type(key)[0] or "application/octet-stream"
-    return Response(data, mimetype=mime)
-"""
 
 app.layout = html.Div([
     dcc.Store(id='graph-store-coins'),
@@ -56,10 +40,6 @@ app.layout = html.Div([
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id='elements-coins-base'),   # base elements (no bg_* fields)
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
-
-
-
-
 
     html.Div(
         id='start-app-overlay',
@@ -79,6 +59,8 @@ app.layout = html.Div([
                 'padding': '24px',
                 'maxWidth': '600px',
                 'width': '100%',
+                'border': '2px solid black',
+                'borderRadius': '12px'
             },
             children=[
                 html.H1("Welcome to DiVE"),
@@ -142,34 +124,6 @@ app.layout = html.Div([
     ),
 
 
-
-
-
-    # Selection buttons
-    html.Div([
-    html.Button("Hide Selection", id='hide-selection-button', title='hides all selected nodes',  n_clicks=0, style={'margin': '10px'}),
-    html.Button("Show only Selection", id='show-only-selection-button', title='hides all nodes not in selection', n_clicks=0, style={'margin': '10px'}),
-    html.Button("Reset Selection", id="reset-selection-button", title='resets selection based hiding', n_clicks=0, disabled=True, style={'margin': '10px'}),
-    html.Label("Box selection: shift + left-click + drag"),
-], style={'display': 'flex', 'alignItems': 'center'}),
-    html.Hr(),
-
-
-    # Graph View-Selector
-    html.Div([
-    html.Label("Select View:", style={'marginRight': '10px'}),
-    dcc.RadioItems(
-        id='graph-view-selector',
-        options=[
-            {'label': 'Coin-View', 'value': 'coins'},
-            {'label': 'Die-View', 'value': 'dies'}
-        ],
-        value='coins',
-        inline=True
-    ),
-], style={'display': 'flex', 'alignItems': 'center'}),
-
-
     # Lightbox for coin pictures
     html.Div(
         id='lightbox',
@@ -184,18 +138,32 @@ app.layout = html.Div([
         children=html.Div([
             html.Button(
                 "✕", id='lightbox-close', n_clicks=0,
-                style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px'}
+                style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px', 'fontWeight': 'bold', 'backgroundColor': 'red',}
             ),
             html.Div(id='lightbox-body', style={'position':'relative', 'display':'flex',
                                             'flexDirection':'column', 'alignItems':'center'})
         ])
     ),
 
+                # Graph View-Selector
+    html.Div([
+    dcc.RadioItems(
+        id='graph-view-selector',
+        options=[
+            {'label': 'Coin-View', 'value': 'coins'},
+            {'label': 'Die-View', 'value': 'dies'}
+        ],
+        value='coins',
+        inline=True
+    ),
+    html.Hr()
+], style={'textAlign': 'center',}),
 
     # Sidebar and Graph
     html.Div([
         # Sidebar
         html.Div([ 
+
             # Layout           
             html.H3("Layout"),
             html.Label("Layout-Type"),
@@ -285,9 +253,20 @@ app.layout = html.Div([
                 ],
             ),
 
-            html.Hr(),
-            html.H3("Hide Nodes"),
-            html.Div(id='filter-dropdowns'),
+            html.Div(
+                id='hiding-nodes-container',
+                children=[
+                    html.Hr(),
+                    html.H3("Hide Nodes"),
+                    html.Div(html.Label("by selection:", style={'fontWeight': 'bold'}), style={'marginBottom': '10px'}),
+                    html.Div(html.Label("use box selection: shift + left-click + drag")),
+                    html.Button("Hide Selection", id='hide-selection-button', title='hides all selected nodes',  n_clicks=0, style={'marginRight': '5px'}),
+                    html.Button("Show only Selection", id='show-only-selection-button', title='hides all nodes not in selection', n_clicks=0, style={'marginRight': '5px'}),
+                    html.Button("Reset Selection", id="reset-selection-button", title='resets selection based hiding', n_clicks=0, disabled=True),
+                    html.Div(html.Label("by attribute value:", style={'fontWeight': 'bold'}), style={'marginTop': '20px', 'marginBottom': '10px'}),
+                    html.Div(id='filter-dropdowns'),
+                ],
+            ),
 
             html.Hr(),
             html.H3("Node details"),
@@ -333,7 +312,7 @@ app.layout = html.Div([
             id='cy-coins',
             layout={'name': 'grid'},
             autoRefreshLayout = False,  # disables applying layout on elements change
-            style={'width': '100%', 'height': '800px', 'display': 'block'},
+            style={'width': '100%', 'height': '100%', 'display': 'block'},
             elements=[],
             stylesheet=[{'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200, 'border-width': 2}}],
             boxSelectionEnabled = True,
@@ -343,14 +322,14 @@ app.layout = html.Div([
             id='cy-dies',
             layout={'name': 'grid'},
             autoRefreshLayout = False,
-            style={'width': '100%', 'height': '800px', 'display': 'none'},
+            style={'width': '100%', 'height': '100%', 'display': 'none'},
             elements=[],
             stylesheet=[{'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200, 'border-width': 2}}],
             boxSelectionEnabled = True,
             wheelSensitivity=0.1,
             ),
-        ], style={'flex': '3', 'padding': '10px'})
-    ], style={'display': 'flex', 'flexDirection': 'row', 'height': '90vh'}),
+        ], style={'flex': '3', 'height': '100%'})
+    ], style={'display': 'flex', 'flexDirection': 'row', 'height': '95vh'}),
 
     # pop up for csv > 100lines
     dcc.ConfirmDialog(
@@ -366,9 +345,8 @@ app.layout = html.Div([
 ])
 
 
-register_callbacks(app)
-
-
+register_update_view_callbacks(app)
+register_ui_elements_callbacks(app)
 
 
 
