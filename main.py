@@ -13,6 +13,7 @@ from flask import Response, abort
 from urllib.parse import quote, urlencode
 from image_utils import register_merge_route
 from proxy import register_image_proxy
+from create_view_callbacks import register_create_view_callbacks
 from update_view_callbacks import register_update_view_callbacks
 from ui_elements_callbacks import register_ui_elements_callbacks
 
@@ -344,7 +345,7 @@ app.layout = html.Div([
     ),
 ])
 
-
+register_create_view_callbacks(app)
 register_update_view_callbacks(app)
 register_ui_elements_callbacks(app)
 
