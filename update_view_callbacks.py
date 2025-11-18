@@ -1,7 +1,7 @@
 from dash import Input, Output, State, ctx, no_update, ALL, dcc, html
 import networkx as nx
 from CSVHandler import normalize_key
-from graph_handler import remove_duplicate_dies, add_edges_by_mode, create_dies_graph, nx_to_elements
+from graph_handler import remove_duplicate_dies, add_edges_by_mode, create_dies_graph, nx_to_elements, enrich_images
 from layouts import build_layout
 from styles import base_stylesheet_coins, base_stylesheet_dies, set_hiding_rules, set_color_rules
 
@@ -9,14 +9,16 @@ from styles import base_stylesheet_coins, base_stylesheet_dies, set_hiding_rules
 def register_update_view_callbacks(app):
     @app.callback(
         Output('graph-store-coins', 'data', allow_duplicate=True),
-        Output('elements-coins-base', 'data', allow_duplicate=True),
+        Output('cy-coins', 'elements', allow_duplicate=True),
         Input('edge-mode', 'value'),
         State('graph-store-coins', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
+        State('front-column-url', 'value'),
+        State('back-column-url', 'value'),
         prevent_initial_call=True
     )
-    def rebuild_edges_on_mode_change(edge_mode, graph_data_coins, col_front, col_back):
+    def rebuild_edges_on_mode_change(edge_mode, graph_data_coins, col_front, col_back, front_column_url, back_column_url):
         """
         Deletes all existing edges in Graph and adds new edges based on selected edge mode
         """
@@ -29,20 +31,16 @@ def register_update_view_callbacks(app):
         G.remove_edges_from(G.edges())
         front_key = normalize_key(col_front or "Stempeluntergruppe Av")
         back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
+        front_url_key = normalize_key(front_column_url or "Vorderseite Bild")
+        back_url_key = normalize_key(back_column_url or "Rueckseite Bild")
         add_edges_by_mode(G, front_key, back_key, edge_mode)
 
         base_el = nx_to_elements(G)
 
+        coins_el_images = enrich_images(G, base_el, front_url_key, back_url_key)
+
         # Update the store (so stats/components recompute) and refresh coin-view elements
-        return nx.readwrite.json_graph.node_link_data(G), base_el
-
-
-    @app.callback(
-        Output('cy-coins', 'elements'),
-        Input('elements-coins', 'data'),
-    )
-    def push_to_cytoscape(elements):
-        return elements or []
+        return nx.readwrite.json_graph.node_link_data(G), coins_el_images
 
 
     @app.callback(
@@ -242,22 +240,7 @@ def register_update_view_callbacks(app):
             "coins": [],
             "dies": [],
             }
-        
-                # --- Decide whether to actually update cy-dies.elements ---
-        trigger = ctx.triggered_id
 
-        structural_triggers = (
-            'hide-selection-button',
-            'reset-selection-button',
-            'filter-values-store',
-        )
-        update_die_elements = trigger in structural_triggers
-        
-
-        if update_die_elements:
-            die_elements_out = nx_to_elements(updated_die_graph)
-        else:
-            die_elements_out = no_update
 
         return ss_coins, ss_dies, stats_children, nx_to_elements(updated_die_graph), hidden_out
 

@@ -1,5 +1,6 @@
 import networkx as nx
 from CSVHandler import bg_url_from_csv_value
+from urllib.parse import urlencode
 
 def remove_duplicate_dies(dies):
     seen = {}
@@ -153,3 +154,39 @@ def cyto_elements_to_nx(elements, exclude_hidden):
             graph.add_edge(u, v)
 
     return graph
+
+def enrich_images(G, base_elements, front_img_col_norm, back_img_col_norm):
+    """
+    adds images URLs to Cytoscape nodes
+    """
+
+    # build dict: node_id ->(front_url, back_url)
+    url_by_id = {}
+    for n_id, n_dict in G.nodes(data=True):
+        front_url = bg_url_from_csv_value(n_dict.get(front_img_col_norm))
+        back_url = bg_url_from_csv_value(n_dict.get(back_img_col_norm))
+        url_by_id[str(n_id)] = (front_url, back_url)
+
+    # Enrich base elements with bg_* fields
+    enriched = []
+    for ele in base_elements:
+        if not isinstance(ele, dict) or 'data' not in ele or 'id' not in ele['data']:
+            enriched.append(ele)
+            continue
+
+        ele_id = str(ele['data']['id'])
+        front_url, back_url = url_by_id.get(ele_id, (None, None))
+
+        new_data = dict(ele['data'])
+        if front_url:
+            new_data['bg_front'] = front_url
+        if back_url:
+            new_data['bg_back'] = back_url
+        if front_url and back_url:
+            # Optional merged preview for edge-mode == 'both'
+            params = {'w': 200, 'h': 200, 'front': front_url, 'back': back_url}
+            new_data['bg_split'] = f"/merge_split?{urlencode(params)}"
+
+        enriched.append({'data': new_data})
+
+    return enriched

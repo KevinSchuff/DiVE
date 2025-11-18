@@ -1,16 +1,6 @@
 import dash
 from dash import dcc, html, Input, Output, State, ctx, no_update, ALL
 import dash_cytoscape as cyto
-import networkx as nx
-import base64
-import re
-from CSVHandler import load_graph_from_csv, normalize_key
-import io
-import zipfile
-import csv
-import mimetypes
-from flask import Response, abort 
-from urllib.parse import quote, urlencode
 from image_utils import register_merge_route
 from proxy import register_image_proxy
 from create_view_callbacks import register_create_view_callbacks
@@ -31,15 +21,11 @@ app.title = "DiVE"
 app.layout = html.Div([
     dcc.Store(id='graph-store-coins'),
     dcc.Store(id='graph-store-dies'),
-    dcc.Store(id='elements-coins'),
-    dcc.Store(id='elements-dies'),
     dcc.Store(id='filter-values-store', data={}),
     dcc.Store(id='custom-colors-store', data=[]),
-    dcc.Store(id='zip-file-list', data=[]),
     dcc.Store(id='layout-choices', data={'coins': 'grid', 'dies': 'grid'}),
     dcc.Store(id='pending-csv', data=None),
     dcc.Store(id='csv-approved', data=None),
-    dcc.Store(id='elements-coins-base'),   # base elements (no bg_* fields)
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
 
     html.Div(

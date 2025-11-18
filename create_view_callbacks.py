@@ -1,9 +1,8 @@
 from dash import Input, Output, State, ctx, no_update, ALL, dcc, html
 import networkx as nx
 import base64, csv, io
-from urllib.parse import urlencode
-from CSVHandler import load_graph_from_csv, normalize_key, bg_url_from_csv_value
-from graph_handler import add_edges_by_mode, create_dies_graph, nx_to_elements
+from CSVHandler import load_graph_from_csv, normalize_key
+from graph_handler import add_edges_by_mode, create_dies_graph, nx_to_elements, enrich_images
 
 
 
@@ -86,8 +85,7 @@ def register_create_view_callbacks(app):
     @app.callback(
         Output('graph-store-coins', 'data'),
         Output('graph-store-dies', 'data'),
-        Output('elements-coins-base', 'data'),
-        Output('elements-dies', 'data'),
+        Output('cy-coins', 'elements'),
         Output('cy-dies', 'elements'),
         Output('filter-dropdowns', 'children'),
         Output({'type': 'color-dropdown', 'index': 'red'}, 'options'),
@@ -105,8 +103,7 @@ def register_create_view_callbacks(app):
         Decodes CSV and builds coin graph and die graph. prepares filter und color options UI
         """
         if not contents:
-            return (no_update, no_update, no_update, no_update,
-                    no_update, [], [], [], [])
+            return (no_update, no_update, no_update, no_update, [], [], [], [])
         
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
@@ -159,11 +156,12 @@ def register_create_view_callbacks(app):
         coins_base_el = nx_to_elements(G)             # base (no images)
         dies_el = nx_to_elements(dies_graph)
 
+        coins_el_images = enrich_images(G, coins_base_el, front_url_key, back_url_key)
+
         return (
             nx.readwrite.json_graph.node_link_data(G),
             nx.readwrite.json_graph.node_link_data(dies_graph),
-            coins_base_el,
-            dies_el,
+            coins_el_images,
             dies_el,
             filter_ui,
             options,
@@ -171,56 +169,3 @@ def register_create_view_callbacks(app):
             options
         )
 
-
-    @app.callback(
-        Output('elements-coins', 'data'),
-        Input('elements-coins-base', 'data'),
-        State('graph-store-coins', 'data'),
-        State('front-column-url', 'value'),
-        State('back-column-url', 'value'),
-        prevent_initial_call=True
-    )
-    def enrich_images(base_elements, graph_data_coins, front_img_col, back_img_col):
-        """
-        adds images URLs to Cytoscape nodes
-        """
-        if not base_elements or not graph_data_coins:
-            return no_update
-
-        # get images column names
-        front_img_col_norm = normalize_key(front_img_col or "Vorderseite Bild")
-        back_img_col_norm = normalize_key(back_img_col or "Rueckseite Bild")
-
-        # Rebuild graph to access node attributes
-        G = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
-
-        # build dict: node_id ->(front_url, back_url)
-        url_by_id = {}
-        for n_id, n_dict in G.nodes(data=True):
-            front_url = bg_url_from_csv_value(n_dict.get(front_img_col_norm))
-            back_url = bg_url_from_csv_value(n_dict.get(back_img_col_norm))
-            url_by_id[str(n_id)] = (front_url, back_url)
-
-        # Enrich base elements with bg_* fields
-        enriched = []
-        for ele in base_elements:
-            if not isinstance(ele, dict) or 'data' not in ele or 'id' not in ele['data']:
-                enriched.append(ele)
-                continue
-
-            ele_id = str(ele['data']['id'])
-            front_url, back_url = url_by_id.get(ele_id, (None, None))
-
-            new_data = dict(ele['data'])
-            if front_url:
-                new_data['bg_front'] = front_url
-            if back_url:
-                new_data['bg_back'] = back_url
-            if front_url and back_url:
-                # Optional merged preview for edge-mode == 'both'
-                params = {'w': 200, 'h': 200, 'front': front_url, 'back': back_url}
-                new_data['bg_split'] = f"/merge_split?{urlencode(params)}"
-
-            enriched.append({'data': new_data})
-
-        return enriched
