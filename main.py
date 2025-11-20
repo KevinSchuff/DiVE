@@ -1,33 +1,39 @@
+"""
+This is the main module, from which you can also start the application. It contains the layout of the page and stores.
+"""
+
 import dash
-from dash import dcc, html, Input, Output, State, ctx, no_update, ALL
+from dash import dcc, html
 import dash_cytoscape as cyto
+
 from image_utils import register_merge_route
 from proxy import register_image_proxy
 from create_view_callbacks import register_create_view_callbacks
 from update_view_callbacks import register_update_view_callbacks
 from ui_elements_callbacks import register_ui_elements_callbacks
 
+
 cyto.load_extra_layouts()
 
 app = dash.Dash(__name__)
-# Get the Flask server instance and register the proxy
+# Get the Flask server instance
 server = app.server
 register_merge_route(server)
 register_image_proxy(server)
 
 app.title = "DiVE"
 
-
 app.layout = html.Div([
     dcc.Store(id='graph-store-coins'),
     dcc.Store(id='graph-store-dies'),
     dcc.Store(id='filter-values-store', data={}),
     dcc.Store(id='custom-colors-store', data=[]),
-    dcc.Store(id='layout-choices', data={'coins': 'grid', 'dies': 'grid'}),
+    dcc.Store(id='layout-choices', data={'coins': 'cose-bilkent', 'dies': 'cose-bilkent'}),
     dcc.Store(id='pending-csv', data=None),
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
-
+    
+    # starting overlay
     html.Div(
         id='start-app-overlay',
         style={
@@ -52,12 +58,12 @@ app.layout = html.Div([
             children=[
                 html.H1("Welcome to DiVE"),
                 html.H3("DieLink Visualization Environment"),
-                html.H4("Please enter the corresponding field names and choose a CSV"),
+                html.H4("Please enter the corresponding field names, then choose a CSV file."),
 
                 # User Inputs for Column names
                 html.Div([
                     html.Div([
-                        html.Label("Front column:"),
+                        html.Label("front die column:"),
                         dcc.Input(
                             id='front-column',
                             type='text',
@@ -67,7 +73,7 @@ app.layout = html.Div([
                         ),
                     ], style={'marginBottom': '10px'}),
                     html.Div([
-                        html.Label("Back column:"),
+                        html.Label("back die column:"),
                         dcc.Input(
                             id='back-column',
                             type='text',
@@ -77,9 +83,9 @@ app.layout = html.Div([
                         ),
                     ], style={'marginBottom': '10px'}),
                     html.Div([
-                        html.Label("Front img:"),
+                        html.Label("front image column:"),
                         dcc.Input(
-                            id='front-column-url',
+                            id='front-url-column',
                             type='text',
                             placeholder='Vorderseite Bild',
                             debounce=True,
@@ -87,9 +93,9 @@ app.layout = html.Div([
                         ),
                     ], style={'marginBottom': '10px'}),
                     html.Div([
-                        html.Label("Back img:"),
+                        html.Label("back image column:"),
                         dcc.Input(
-                            id='back-column-url',
+                            id='back-url-column',
                             type='text',
                             placeholder='Rückseite Bild',
                             debounce=True,
@@ -132,7 +138,7 @@ app.layout = html.Div([
         ])
     ),
 
-                # Graph View-Selector
+    # Graph View-Selector
     html.Div([
     dcc.RadioItems(
         id='graph-view-selector',
@@ -144,9 +150,10 @@ app.layout = html.Div([
         inline=True
     ),
     html.Hr()
-], style={'textAlign': 'center',}),
+    ], style={'textAlign': 'center',}),
 
-    # Sidebar and Graph
+
+    # Sidebar and Visualizations
     html.Div([
         # Sidebar
         html.Div([ 
@@ -159,14 +166,13 @@ app.layout = html.Div([
                 options=[
                     {'label': 'cose', 'value': 'cose'},
                     {'label': 'cose-bilkent', 'value': 'cose-bilkent'},
-                    {'label': 'cola (experimental)', 'value': 'cola'},
                     {'label': 'dagre', 'value': 'dagre'},
                     {'label': 'klay', 'value': 'klay'},
                     {'label': 'grid', 'value': 'grid'},
                     {'label': 'circle', 'value': 'circle'},
                     {'label': 'concentric', 'value': 'concentric'},
                 ],
-                value='grid',
+                value='cose-bilkent',
                 clearable=False,
                 style={'marginBottom': '10px'}
             ),
@@ -179,6 +185,7 @@ app.layout = html.Div([
             ),
             html.Hr(),
 
+            # Edge controls
             html.Div([
                 html.H3("Edge options"),
                 html.Div(
@@ -213,11 +220,11 @@ app.layout = html.Div([
                 ),
             ]),
             
+            # Coloring Nodes
             html.Div(
                 id='color-nodes-container',
                 children=[
                     html.Hr(),
-                    # Color Nodes
                     html.H3("Color nodes by attribute value"),
                     html.Label("Red:"),
                     dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'red'}, multi=True, searchable=True),
@@ -240,6 +247,7 @@ app.layout = html.Div([
                 ],
             ),
 
+            # Hiding Nodes
             html.Div(
                 id='hiding-nodes-container',
                 children=[
@@ -255,6 +263,7 @@ app.layout = html.Div([
                 ],
             ),
 
+            # Node Details
             html.Hr(),
             html.H3("Node details"),
             html.Div(id='node-info-box', style={
@@ -264,6 +273,8 @@ app.layout = html.Div([
                 'overflowY': 'auto',
                 'backgroundColor': '#f9f9f9'
             }),
+
+            # Statistics
             html.Hr(),
             html.H3("Statistics"),
             html.Div(
@@ -277,6 +288,8 @@ app.layout = html.Div([
                     'marginTop': '6px'
                 }
             ),
+
+            # Export
             html.Div(
                 id='export-container',
                 children=[
@@ -289,15 +302,12 @@ app.layout = html.Div([
             ], style={'flex': '1', 'padding': '10px', 'maxWidth': '400px', 'overflowY': 'auto'}),
 
 
-
-            
-
-        # Graphs
+        # Visualizations
         html.Div([
             # Two Cytoscape instances kept mounted; we toggle visibility only
             cyto.Cytoscape(
             id='cy-coins',
-            layout={'name': 'grid'},
+            layout={'name': 'cose'},
             autoRefreshLayout = False,  # disables applying layout on elements change
             style={'width': '100%', 'height': '100%', 'display': 'block'},
             elements=[],
@@ -307,7 +317,7 @@ app.layout = html.Div([
             ),
             cyto.Cytoscape(
             id='cy-dies',
-            layout={'name': 'grid'},
+            layout={'name': 'cose'},
             autoRefreshLayout = False,
             style={'width': '100%', 'height': '100%', 'display': 'none'},
             elements=[],

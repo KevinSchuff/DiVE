@@ -1,14 +1,19 @@
-from dash import Input, Output, State, ctx, no_update, ALL, dcc, html
+"""
+This module is responsible for creating the first visualizations based on the chosen csv file. It also populates the dropdowns of ui elements.
+"""
+
+from dash import Input, Output, State, ctx, no_update, dcc, html
 import networkx as nx
 import base64, csv, io
-from CSVHandler import load_graph_from_csv, normalize_key
+
+from csv_handler import load_graph_from_csv, normalize_key
 from graph_handler import add_edges_by_mode, create_dies_graph, nx_to_elements, enrich_images
 
 
-
-
-
 def register_create_view_callbacks(app):
+    """
+    This function registers all relevant callbacks to creating the first visualizations.
+    """
     @app.callback(
         Output('csv-approved', 'data'),
         Output('pending-csv', 'data'),
@@ -21,8 +26,29 @@ def register_create_view_callbacks(app):
     )
     def gate_and_decide(contents, ok_clicks, cancel_clicks, pending):
         """
-        gatekeeps larger csv. if it is < 100 rows accept immediately, else stash in pending-csv and show dialogue box
+        This callback gatekeeps larger csv files. if it is < 100 rows accept immediately, else stash in pending-csv and show dialogue box.
+
+        Parameters
+        ----------
+        contents : str or None
+            base64 encoded string containing uploaded CSV file's content
+        ok_clicks : int or None
+            Number of times the OK button in dialogue box was clicked.
+        cancel_clicks : int or None
+            Number of times the Cancel button in dialogue box was clicked.
+        pending : str or None
+            Temporary store for base64 encoded string containing uploaded CSV file's content when file too big.
+
+        Returns
+        -------
+        csv_approved_data : str or None
+            Approved base64 encoded string containing uploaded CSV file's content, which may be limited.
+        pending_csv_data : str or None
+            CSV data to store temporarily while awaiting user confirmation.
+        csv_size_warning_displayed : bool  
+            Decides to display or hide the dialogue box.
         """
+
         # check which input triggered
         trig = ctx.triggered_id
 
@@ -94,14 +120,49 @@ def register_create_view_callbacks(app):
         Input('csv-approved', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
-        State('front-column-url', 'value'),
-        State('back-column-url', 'value'),
+        State('front-url-column', 'value'),
+        State('back-url-column', 'value'),
         State('edge-mode', 'value'),
     )
-    def handle_file_upload(contents, col_front, col_back, col_front_url, col_back_url, edge_mode):
+    def handle_file_upload(contents, front_column, back_column, front_url_column, back_url_column, edge_mode):
         """
         Decodes CSV and builds coin graph and die graph. prepares filter und color options UI
+
+        Parameters
+        ----------
+        contents : str or None
+            Base64 encoded string containing uploaded CSV file's content
+        front_column : str or None
+            Text in 'front-column' input fields.
+        back_column : str or None
+            Text in 'front-column' input fields.
+        front_url_column : str or None
+            Text in 'front-url-column' input fields.
+        back_url_column : str or None
+            Text in 'back-url-column' input fields.
+        edge_mode : 'front' or 'back' or 'both' or None
+            Selected option from radio buttons for edge mode
+
+        Returns
+        -------
+        dict
+            Stores graph, node and edge attributes from coins.
+        dict
+            Stores graph, node and edge attributes from dies.
+        list of dict  
+            Element list of dash cytoscape instance cy-coins.
+        list of dict 
+            Element list of dash cytoscape instance cy-dies.
+        list of dash.html.Div
+            Contains one div per coin attribute, each with label and dropdown(all possible values).
+        list of dict 
+            Contains dropdown options with all possible attribute:value combinations for red coloring.
+        list of dict  
+            Contains dropdown options with all possible attribute:value combinations for blue coloring.
+        list of dict  
+            Contains dropdown options with all possible attribute:value combinations for green coloring.
         """
+
         if not contents:
             return (no_update, no_update, no_update, no_update, [], [], [], [])
         
@@ -110,10 +171,10 @@ def register_create_view_callbacks(app):
         G = load_graph_from_csv(decoded)
 
         # Normalize the user-provided (or default) column names
-        front_key = normalize_key(col_front or "Stempeluntergruppe Av")
-        back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(col_front_url or "Vorderseite Bild")
-        back_url_key = normalize_key(col_back_url or "Rueckseite Bild")
+        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
+        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
+        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
+        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
 
         # build edges according to selected mode
         add_edges_by_mode(G, front_key, back_key, edge_mode)
@@ -153,16 +214,16 @@ def register_create_view_callbacks(app):
             )
 
         # cytoscape elements for graphs
-        coins_base_el = nx_to_elements(G)             # base (no images)
-        dies_el = nx_to_elements(dies_graph)
+        coins_base_elements = nx_to_elements(G)             # base (no images)
+        dies_elements = nx_to_elements(dies_graph)
 
-        coins_el_images = enrich_images(G, coins_base_el, front_url_key, back_url_key)
+        coins_with_images_elements = enrich_images(G, coins_base_elements, front_url_key, back_url_key)
 
         return (
             nx.readwrite.json_graph.node_link_data(G),
             nx.readwrite.json_graph.node_link_data(dies_graph),
-            coins_el_images,
-            dies_el,
+            coins_with_images_elements,
+            dies_elements,
             filter_ui,
             options,
             options,

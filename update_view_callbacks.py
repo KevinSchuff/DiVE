@@ -1,12 +1,27 @@
+"""
+This module handles all callbacks, that are relevant for updating the cytoscape instances, this includes
+edge rebuilding, filtering, coloring and layout changes for both coin- and die-view.
+"""
+
 from dash import Input, Output, State, ctx, no_update, ALL, dcc, html
 import networkx as nx
-from CSVHandler import normalize_key
+
+from csv_handler import normalize_key
 from graph_handler import remove_duplicate_dies, add_edges_by_mode, create_dies_graph, nx_to_elements, enrich_images
 from layouts import build_layout
 from styles import base_stylesheet_coins, base_stylesheet_dies, set_hiding_rules, set_color_rules
 
 
 def register_update_view_callbacks(app):
+    """
+    Register all dash callbacks relevant to updating the cytoscape instances to the app.
+
+    Parameters
+    ----------
+    app : dash.Dash
+        Dash application instance to which the callbacks will be attached.
+    """
+
     @app.callback(
         Output('graph-store-coins', 'data', allow_duplicate=True),
         Output('cy-coins', 'elements', allow_duplicate=True),
@@ -14,14 +29,37 @@ def register_update_view_callbacks(app):
         State('graph-store-coins', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
-        State('front-column-url', 'value'),
-        State('back-column-url', 'value'),
+        State('front-url-column', 'value'),
+        State('back-url-column', 'value'),
         prevent_initial_call=True
     )
-    def rebuild_edges_on_mode_change(edge_mode, graph_data_coins, col_front, col_back, front_column_url, back_column_url):
+    def rebuild_edges_on_mode_change(edge_mode, graph_data_coins, front_column, back_column, front_url_column, back_url_column):
         """
-        Deletes all existing edges in Graph and adds new edges based on selected edge mode
+        Rebuild edges in coin-view when the edge-mode changes.
+
+        Parameters
+        ----------
+        edge_mode : str
+            String contains currenty selected edge mode for coin-view. Is either front, back or both.
+        graph_data_coins : dict or None
+            stores graph, node and edge attributes from coins.
+        front_column : str or None
+            String inside inputfield with id 'front-column'. 
+        back_column : str or None
+            String inside inputfield with id 'back-column'
+        front_url_column : str or None
+            String inside inputfield with id 'front-url-column'
+        back_url_column : str or None
+            String inside inputfield with id 'back-url-column'
+
+        Returns
+        -------
+        dict
+            stores graph, node and edge attributes from coins.
+        list of dict  
+            element list of dash cytoscape instance cy-coins.
         """
+
         if not graph_data_coins:
             return no_update, no_update
 
@@ -29,18 +67,19 @@ def register_update_view_callbacks(app):
         G = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
         # Remove all existing edges and rebuild according to radio selection
         G.remove_edges_from(G.edges())
-        front_key = normalize_key(col_front or "Stempeluntergruppe Av")
-        back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(front_column_url or "Vorderseite Bild")
-        back_url_key = normalize_key(back_column_url or "Rueckseite Bild")
+
+        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
+        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
+        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
+        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
+
         add_edges_by_mode(G, front_key, back_key, edge_mode)
 
-        base_el = nx_to_elements(G)
+        # convert to elements
+        coins_base_elements = nx_to_elements(G)
+        coins_with_images_elements = enrich_images(G, coins_base_elements, front_url_key, back_url_key)
 
-        coins_el_images = enrich_images(G, base_el, front_url_key, back_url_key)
-
-        # Update the store (so stats/components recompute) and refresh coin-view elements
-        return nx.readwrite.json_graph.node_link_data(G), coins_el_images
+        return nx.readwrite.json_graph.node_link_data(G), coins_with_images_elements
 
 
     @app.callback(
@@ -50,10 +89,25 @@ def register_update_view_callbacks(app):
         State({'type': 'filter-dropdown', 'index': ALL}, 'id'),
         prevent_initial_call=True
     )
-    def collect_filter_values(values_list, upload_contents, ids):
+    def collect_filter_values(values_list, contents, ids):
         """
-        Collect current selection of all filtr dropdowns and store them in a dict
+        Collects current selection of all filter dropdowns.
+
+        Parameters
+        ----------
+        values_list : list of list
+            List of selected values for each filter dropdown.
+        contents : str or None
+            base64 encoded string containing uploaded CSV file's content
+        ids : list of dict
+            List of dropdown component IDs, index key represents attribute name.
+
+        Returns
+        -------
+        dict
+            Mapping of attribute name to a list of selected values.
         """
+
         # if upload triggered -> empty store
         if ctx.triggered_id == 'upload-data':
             return {}
@@ -69,7 +123,6 @@ def register_update_view_callbacks(app):
         return result or {}
 
 
-    # Toggle which Cytoscape is visible (keep both mounted)
     @app.callback(
         Output('cy-coins', 'style'),
         Output('cy-dies', 'style'),
@@ -79,6 +132,28 @@ def register_update_view_callbacks(app):
         Input('graph-view-selector', 'value'),
         )
     def toggle_visible_view(view):
+        """
+        Toggle visibility of coin- and die-view (cytoscape instances) and associated UI-controls.
+
+        Parameters
+        ----------
+        view : str
+            Currently selected view from the graph view selector.
+
+        Returns
+        -------
+        dict
+            Style for the coin Cytoscape instance.
+        dict
+            Style for the die Cytoscape instance.
+        dict
+            Style for the scale-weighted-edges container.
+        dict
+            Style for the edge-mode container.
+        dict
+            Style for the color-nodes container.
+        """
+         
         base = {'width': '100%', 'height': '100%'}
         if view == 'dies':
             return {**base, 'display': 'none'}, {**base, 'display': 'block'}, {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
@@ -105,31 +180,89 @@ def register_update_view_callbacks(app):
         State('graph-store-dies', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
-        State('front-column-url', 'value'),
-        State('back-column-url', 'value'),
+        State('front-url-column', 'value'),
+        State('back-url-column', 'value'),
         State('cy-coins', 'selectedNodeData'),
         State('cy-dies', 'selectedNodeData'),
         State('hidden-store', 'data'),
         State('cy-dies', 'elements'),   
         prevent_initial_call=True
     )
-    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store, edge_mode, scale_weighted_edges, color_ids,
-                                graph_data_coins, graph_data_dies, col_front, col_back, col_front_url, col_back_url, selected_nodes_coins,
+    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store,
+                                edge_mode, scale_weighted_edges, color_ids, graph_data_coins, graph_data_dies,
+                                front_column, back_column, front_url_column, back_url_column, selected_nodes_coins,
                                 selected_nodes_dies, hidden, dies_elements_current):
         """
-        Updates stylesheets and stat box on change of view, color , filter or edge mode selection
+        Update die elementslist, coin- and die-stylsheet, statistics and hidden stores.
+        This callback triggers upon any selection button, view change, changes in the dropdown's, changing edge options.
+
+        Parameters
+        ----------
+        show_click : int or None
+            Number of clicks on the 'show only selection' button.
+        hide_click : int or None
+            Number of clicks on the 'hide selection' button.
+        unhide_click : int or None
+            Number of clicks on the "reset selection" button.
+        view : str
+            Currently selected view from the graph view selector.
+        color_values_list : list of list of str
+            Each element in the list is a list of condition strings (looking like attr=value) for a particular color.
+            Nodes with the logical conjuction of attribute values should be colored.
+        filter_store : dict
+            Mapping of attribute name to a list of selected values.
+        edge_mode : str
+            String contains currenty selected edge mode for coin-view. Is either front, back or both.
+        scale_weighted_edges : list
+            List contains 'on' if checklist is clicked, else empty.
+        color_ids : list of dict
+            IDs of the color-dropdown components (used to map to attributes).
+        graph_data_coins : dict or None
+            Stores graph, node and edge attributes from coins.
+        graph_data_dies : dict or None
+            Stores graph, node and edge attributes from dies.
+        front_column : str or None
+            Text in 'front-column' input fields.
+        back_column : str or None
+            Text in 'front-column' input fields.
+        front_url_column : str or None
+            Text in 'front-url-column' input fields.
+        back_url_column : str or None
+            Text in 'back-url-column' input fields.
+        selected_nodes_coins : list of dict or None
+            Selected nodes in the coin cytoscape instance.
+        selected_nodes_dies : list of dict or None
+            Selected nodes in the die cytoscape instance.
+        hidden : dict or None
+            Previously stored hidden coin and die information.
+        dies_elements_current : list of dict or None
+            Current elementlist from die cytoscape instance.
+
+        Returns
+        -------
+        list of dict
+            Stylesheet for the coin cytoscape instance.
+        list of dict
+            Stylesheet for the die cytoscape instance.
+        dash.html.Div
+            Children for the stats box, containing statistics.
+        list of dict
+            Elementlist from die cytoscape instance after updating.
+        dict
+            Updated stored hidden coin and die information.
         """
+        # if no coin graph exists yet, nothing can be updated
         if not graph_data_coins:
             return no_update, no_update, no_update, no_update, no_update
-        
+        # rebuild networkX graph from stored graph structure
         G_coins_full = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
         # prepare column names
-        front_key = normalize_key(col_front or "Stempeluntergruppe Av")
-        back_key = normalize_key(col_back or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(col_front_url or "Vorderseite Bild")
-        back_url_key = normalize_key(col_back_url or "Rueckseite Bild")
+        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
+        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
+        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
+        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
 
-        # apply attribute based filter
+        # apply attribute based filter to coin graph
         hide_nodes_attr = set()
         if filter_store:
             for attr, values in filter_store.items():
@@ -145,11 +278,11 @@ def register_update_view_callbacks(app):
         hidden_store_dies = hidden_store.get("dies", [])  # list of die obj like {"id":, .., "typ":, ...,}
 
         # Decide what coins/dies to hide
-        # Case1: "Unhide Selection" was clicked -> reset everything that is selection-based
+        # Case 1: "Unhide Selection" was clicked -> reset everything that is selection-based
         if ctx.triggered_id == "reset-selection-button":
             all_hidden_coins_ids = set()
             all_hidden_dies_objs = []
-        # Case2: "Hide Selection" was clicked -> extend hidden stores with current selection
+        # Case 2: "Hide Selection" was clicked -> extend hidden stores with current selection
         elif ctx.triggered_id == "hide-selection-button":
             # add current selection of current view to hidden store
             if view == 'coins':
@@ -160,7 +293,7 @@ def register_update_view_callbacks(app):
                 selection_dies = [{"id": str(d["id"]), "typ": d.get("typ")} for d in (selected_nodes_dies or [])if isinstance(d, dict) and "id" in d]
                 all_hidden_dies_objs = remove_duplicate_dies(hidden_store_dies + selection_dies)
                 all_hidden_coins_ids = set(hidden_store_coins) #make to list?
-        # Case3: "Show only Selection" was clicked -> extend hidden stores with everything but the current selection
+        # Case 3: "Show only Selection" was clicked -> extend hidden stores with everything but the current selection
         elif ctx.triggered_id == "show-only-selection-button":
             if view == 'coins':
                 # nodes currently visible after attribute-based filter
@@ -181,7 +314,7 @@ def register_update_view_callbacks(app):
                 not_selected_dies_ids = visible_die_ids - selection_ids
                 # convert to dies obj with id and typ
                 new_hidden_dies_obj = []
-                # get not selected dies typ
+                # build die objexts for all not selected dies, that now should be hidden
                 for el in (dies_elements_current or []):
                     if "id" in el.get("data", {}):
                         data = el.get("data", {})
@@ -190,7 +323,7 @@ def register_update_view_callbacks(app):
                             new_hidden_dies_obj.append({"id": node_id, "typ": data.get("typ")})
                 all_hidden_dies_objs = remove_duplicate_dies(hidden_store_dies + new_hidden_dies_obj)
                 all_hidden_coins_ids = set(hidden_store_coins)
-        # Case3: view change, attribute filter, colors or edgemode triggered the callback -> use only hidden store 
+        # Case4: Any other trigger (view change, attribute filter, colors or edgemode) triggered the callback -> use only hidden store 
         else:
             all_hidden_coins_ids = set(hidden_store_coins)
             all_hidden_dies_objs = hidden_store_dies
@@ -241,7 +374,6 @@ def register_update_view_callbacks(app):
             "dies": [],
             }
 
-
         return ss_coins, ss_dies, stats_children, nx_to_elements(updated_die_graph), hidden_out
 
 
@@ -254,6 +386,25 @@ def register_update_view_callbacks(app):
         prevent_initial_call=True
     )
     def set_layout(selected_layout, active_view, auto_layout_toggle):
+        """
+        Set the layout of the coin and die cytoscape instances.
+
+        Parameters
+        ----------
+        selected_layout : str
+            String contains requested layout from layout-selector ui component.
+        active_view : str
+            Currently selected view from the graph view selector.
+        auto_layout_toggle : list
+            List contains 'on' if checklist is clicked, else empty.
+
+        Returns
+        -------
+        dict 
+            Layout configuration for the coin cytoscape instance
+        dict
+            Layout configuration for the die cytoscape instance.
+        """
 
         auto_enabled = 'on' in (auto_layout_toggle or [])
         layout = build_layout(selected_layout)

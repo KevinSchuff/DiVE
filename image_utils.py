@@ -1,37 +1,39 @@
-import io, os, requests
+"""
+This module handels interaction with image urls and merging images.
+"""
+
+import os, requests
 import numpy as np
 import cv2
 from urllib.parse import urlparse, parse_qs, unquote
 from flask import Response, request
 from functools import lru_cache
-from proxy import proxify
-import re
+
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 10
 
-# check if string looks like url
-def is_url(s: str) -> bool:
-    return bool(re.match(r'^[a-zA-Z][a-zA-Z0-9+.\-]*://', s)) or s.startswith("data:")
-
-# normalizes file path string
-def norm_path(p: str) -> str:
-    return p.replace("\\", "/").lstrip("./")
-
-def bg_url_from_csv_value(raw_val: str):
-    if not raw_val:
-        return None
-    s = str(raw_val).strip()
-    if not s:
-        return None
-    if is_url(s):
-        return proxify(s)               # external URL through Proxy
-    return "/assets/" + norm_path(s)    # relative paths in assets
-
-
 def _load_bytes_from_source(src: str) -> bytes:
-    """Load raw bytes from assets, /img_proxy?url=..., or http(s)."""
+    """
+    Load raw bytes from source string
+
+    Parameters
+    ----------
+    scr : str
+        Source string corresponding to image url or relative path
+
+    Returns
+    -------
+    bytes
+        Raw file contents loaded from the source.
+
+    Raises
+    ------
+    ValueError
+        for img_proxy case if url does not contain url query parameter.
+    """
+
     if not src:
         raise ValueError("empty source")
 
@@ -64,27 +66,53 @@ def _load_bytes_from_source(src: str) -> bytes:
 
 # identical merge urls only get calculated once
 @lru_cache(maxsize=1024)
-def merge_side_by_side(front: str, back: str, w: int = 200, h: int = 200) -> bytes:
-    """Return merged image: left half from front + right half from back (stretched to w×h)."""
+def merge_side_by_side(front, back, w = 200, h = 200):
+    """
+    Merges two images side by side into a new png image.
+    Loads images, resizes them to be the same width height and than merges them.
+    Left side should come front image of a coin and right side from a back image of a coin.
+    Also it caches function results.
+
+    Parameters
+    ----------
+    front : str
+        Source string for left side of merged image.
+    back : str
+        Source string for right side of merged image.
+    w : int
+        Target width for merged image. Default is set to 200(pixels).
+    h : int
+        Target height for merged image. Default is set to 200(pixels).
+
+    Returns
+    -------
+    bytes
+        PNG encoded merged image.
+
+    Raises
+    ------
+    ValueError
+        If input image couldnt be decoded or enoding of merged image failed.
+    """
 
     # Load raw bytes
-    fb = _load_bytes_from_source(front)
-    bb = _load_bytes_from_source(back)
+    front_bytes = _load_bytes_from_source(front)
+    back_bytes = _load_bytes_from_source(back)
 
     # Decode into OpenCV images
-    fimg = cv2.imdecode(np.frombuffer(fb, np.uint8), cv2.IMREAD_COLOR)
-    bimg = cv2.imdecode(np.frombuffer(bb, np.uint8), cv2.IMREAD_COLOR)
-    if fimg is None or bimg is None:
+    front_img_decoded = cv2.imdecode(np.frombuffer(front_bytes, np.uint8), cv2.IMREAD_COLOR)
+    back_img_decoded = cv2.imdecode(np.frombuffer(back_bytes, np.uint8), cv2.IMREAD_COLOR)
+    if front_img_decoded is None or back_img_decoded is None:
         raise ValueError("One of the images could not be decoded")
 
     # Direct resize to target size (may distort aspect ratio)
-    f_resized = cv2.resize(fimg, (w, h), interpolation=cv2.INTER_AREA)
-    b_resized = cv2.resize(bimg, (w, h), interpolation=cv2.INTER_AREA)
+    front_img_resized = cv2.resize(front_img_decoded, (w, h), interpolation=cv2.INTER_AREA)
+    back_img_resized = cv2.resize(back_img_decoded, (w, h), interpolation=cv2.INTER_AREA)
 
     # Left half from front, right half from back
     mid = w // 2
-    left_half  = f_resized[:, :mid]
-    right_half = b_resized[:, mid:w]
+    left_half  = front_img_resized[:, :mid]
+    right_half = back_img_resized[:, mid:w]
     merged = np.hstack((left_half, right_half))
 
     # Encode back to PNG
@@ -95,12 +123,29 @@ def merge_side_by_side(front: str, back: str, w: int = 200, h: int = 200) -> byt
     return buf.tobytes()
 
 
-
-
 def register_merge_route(flask_app):
-    """Register /merge_split route in Flask app."""
+    """
+    Register /merge_split route in Flask app.
+    Endpoint accepts GET requests with query parameters front, back, w, h.
+
+    Parameters
+    ----------
+    flask_app : Flask
+        Flask application instance, where the route will be registered.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    None   
+        This function itself does not raise expections, but created route may return HTTP 400 or 500 responses.
+    """
+
     @flask_app.get("/merge_split")
     def merge_split_route():
+
         front = request.args.get("front") or ""
         back  = request.args.get("back") or ""
         w     = request.args.get("w", type=int) or 200

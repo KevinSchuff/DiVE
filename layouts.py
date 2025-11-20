@@ -1,6 +1,19 @@
-def build_layout(name: str):
-    # https://js.cytoscape.org/#layouts
-    # Link to extra layouts https://dash.plotly.com/cytoscape/layout
+def build_layout(name):
+    """
+    Builds a layout configuration dictionary.
+    Different cytoscape layout support different parameters and this function applies some defaults for each.
+
+    Parameters
+    ----------
+    name : str
+        This string contains the name of the selected layout.
+
+    Returns
+    -------
+    dict
+        Dictionary of layout configurations.
+    """
+
     layout = {'name': name,'fit': True,'padding': 30,}
         
     if name == 'concentric':
@@ -32,17 +45,7 @@ def build_layout(name: str):
             'gravityRangeCompound': 3.0,
             'animate': False,
         })
-    # needs fix : first preset, than apply layout
-    elif name == 'cola':
-        layout.update({
-            'randomize': False,
-            'avoidOverlap': True,
-            'nodeSpacing': 16,      # smaller -> components can sit closer
-            'edgeLength': 240,      # slightly shorter springs
-            'maxSimulationTime': 2000,
-            'infinite': False,           # keep the simulation alive
-            'animate': True,
-        })
+        
     elif name == 'dagre':
         layout.update({
             'rankDir': 'LR',          # LR (left→right) or TB (top→bottom)

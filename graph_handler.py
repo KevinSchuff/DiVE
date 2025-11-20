@@ -1,19 +1,56 @@
+"""
+This module handles all interaction with the graphstructures and related helper functions.
+"""
+
 import networkx as nx
-from CSVHandler import bg_url_from_csv_value
+
+from csv_handler import bg_url_from_csv_value
 from urllib.parse import urlencode
 
+
 def remove_duplicate_dies(dies):
+    """
+    Removes duplicates from list of die objects.
+
+    Parameters
+    ----------
+    dies : list of dict
+        List of die dictionaries, with keys id and typ, which may contain duplicates.
+
+    Returns
+    -------
+    list of dict
+        List of unique die dictionaries, with keys id and typ.
+    """
+
     seen = {}
     for die in dies:
         key = (str(die.get("id")), die.get("typ"))
         seen[key] = {"id": key[0], "typ": key[1]}
     return list(seen.values())
 
-def add_edges_by_mode(G: nx.Graph, front_key: str, back_key: str, mode: str = 'both'):
-    """
-    Add edges in coinview based on matching dies and depending on selected edge mode.
 
+def add_edges_by_mode(G, front_key, back_key, mode = 'both'):
     """
+    Adds edges in coin-graph based on matching dies and depending on selected edge mode.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        NetworkX graph contains coin-graph structure.
+    front_key : str
+        String referencing the front-die attribute of a coin (node).
+    back_key : str
+        String referencing the back-die attribute of a coin (node).
+    mode : str
+        String contains currenty selected edge mode for coin-view. Is either front, back or both.
+        
+    Returns
+    -------
+    None
+        This fuction modifies the graph in place.
+    """
+
     # Each item is (node id, node attributes dict)
     nodes = list(G.nodes(data=True))
     # compare every node pair 
@@ -36,10 +73,40 @@ def add_edges_by_mode(G: nx.Graph, front_key: str, back_key: str, mode: str = 'b
             elif mode == 'both' and front_u and back_u and front_u == front_v and back_u == back_v:
                 G.add_edge(u_id, v_id, attr='same_front_back', label=(front_u + '/' + back_v))
 
+
 def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden_dies=None, front_url_col=None, back_url_col=None):
     """
-    Build die-graph skipping over hidden coins and dies.
+    Builds die-graph from coin-graph, skipping over hidden coins and dies. Each node represents a die with attribtues
+    describing the type and the list of coins associated with it. Edges symbolizes two dies where used together, minting a coin.
+
+    Parameters
+    ----------
+    coin_graph : nx.Graph
+        NetworkX graph contains coin-graph structure.
+    front_col : str
+        String referencing the front-die attribute of a coin (node).
+    back_col : str
+        String referencing the back-die attribute of a coin (node).
+    hidden_coins : list of str or None
+        List of strings, where every str is the coin_id of a coin. These are supposed to be skipped while creating the die-graph.
+    hidden_dies : list of dict or None
+        List of die dictionaries, where every die dictionary represents a die with keys id and typ.
+        These are supposed to be skipped while creating the die-graph.
+    front_url_col : str or None
+        String referencing the front-die url attribute of a coin (node).
+    back_url_col : str or None
+        String referencing the back-die url attribute of a coin (node).
+    
+    Returns
+    -------
+    nx.Graph
+        NetworkX graph contains die-graph structure.
+        Every node is a die, with attributes typ, coin_ids and bg_die (used as background picture).
+        Two dies have an edge, if a node in coin-graph had both dies as attribute.
+    int
+        maximum edge weight in die graph.
     """
+
     die_graph = nx.Graph()
     skip_coins = set(hidden_coins or [])
     skip_dies = set(hidden_dies)
@@ -95,10 +162,21 @@ def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden
     return die_graph, max_edge_weight
 
 
-def nx_to_elements(G: nx.Graph):
+def nx_to_elements(G):
     """
     Convert NetworkX graph into dash cytoscape elements list
+
+    Parameters
+    ----------
+    G : nx.Graph
+        NetworkX graph representing either coin-graph or die-graph
+        
+    Returns
+    -------
+    list of dict
+        List of dictionaries suitable for elements property of a dash cytoscape component.
     """
+
     elements = []
     # add all nodes with attributes to elements
     for node_id, node_attributes in G.nodes(data=True):
@@ -117,9 +195,20 @@ def nx_to_elements(G: nx.Graph):
 
     return elements
 
+
 def cyto_elements_to_nx(elements, exclude_hidden):
     """
-    converts cyto elements list to networkX graph
+    Convert dash cytoscape elements list into NetworkX graph
+
+    Parameters
+    ----------
+    elements : list of dict
+        List of dictionaries suitable for elements property of a dash cytoscape component.
+        
+    Returns
+    -------
+    nx.Graph
+        NetworkX graph representing either coin-graph or die-graph
     """
 
     graph = nx.Graph()
@@ -155,16 +244,33 @@ def cyto_elements_to_nx(elements, exclude_hidden):
 
     return graph
 
-def enrich_images(G, base_elements, front_img_col_norm, back_img_col_norm):
+
+def enrich_images(G, base_elements, front_url_key, back_url_key):
     """
-    adds images URLs to Cytoscape nodes
+    Adds bg_* attributes to elements list, that will be used for adding background images to nodes.
+
+    Parameters
+    ----------
+    G : nx.Graph
+        NetworkX Graph containing coin-graph structure.
+    base_elements: list of dict
+        List of dictionaries suitable for elements property of a dash cytoscape component, without background image attributes.
+    front_url_key:
+        Normalizes String containing front images column name.
+    back_url_key:
+        Normalizes String containing back images column name.
+
+    Returns
+    -------
+    list of dict
+        List of dictionaries suitable for elements property of a dash cytoscape component, with background image attributes.
     """
 
     # build dict: node_id ->(front_url, back_url)
     url_by_id = {}
     for n_id, n_dict in G.nodes(data=True):
-        front_url = bg_url_from_csv_value(n_dict.get(front_img_col_norm))
-        back_url = bg_url_from_csv_value(n_dict.get(back_img_col_norm))
+        front_url = bg_url_from_csv_value(n_dict.get(front_url_key))
+        back_url = bg_url_from_csv_value(n_dict.get(back_url_key))
         url_by_id[str(n_id)] = (front_url, back_url)
 
     # Enrich base elements with bg_* fields

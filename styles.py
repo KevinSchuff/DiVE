@@ -1,10 +1,47 @@
+"""
+Helpers for bulding dash cytoscape stylesheets.
+"""
+
 # stylesheet generation
 _css_esc = str.maketrans({"\\": r"\\\\", '"': r"\\\"", "'": r"\\'", "]": r"\\]", "[": r"\\["})
 # make string safe to embed inside cytoscape attribute selector
-def css_escape(s: str) -> str:
+def css_escape(s):
+    """
+    Escape a string for safe use inside cytoscape attribute selectors.
+
+    Parameters
+    ----------
+    s : str
+        String to escape.
+
+    Returns
+    -------
+    str
+        Escaped string, safe to embed in cytoscape selectors.
+    """
+
     return str(s).translate(_css_esc)
 
 def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
+    """
+    Build the cytoscape base stylesheet for the die-view.
+    Nodes display their label and optionally a background image for dies.
+    Edges display their weight and edge width can be scaled based on edge weight.
+    Selected Nodes are highlighted with thicker border.
+
+    Parameters
+    ----------
+    scale_edges_weight : bool
+        If true, edges will be scaled with their weight.
+    max_edge_weight : int
+        Maximum edge weight in the die-graph.
+
+    Returns
+    -------
+    list of dict
+        List of cytoscape stylesheet rule dictionaries for the die-view.
+    """
+
     stylesheet = [
         {'selector': 'node', 'style': {'label': 'data(label)'}},
         {
@@ -50,8 +87,22 @@ def base_stylesheet_dies(scale_edges_weight=False, max_edge_weight = 0):
 
 def base_stylesheet_coins(edge_mode='front'):
     """
-    Build the Cytoscape stylesheet for the coin-view.
+    Build the cytoscape base stylesheet for the coin-view.
+    Nodes display their label and based on edge_mode a background image.
+    Edges display display the corresponding dies as label, which are used to connect the nodes(coins).
+    Selected Nodes are highlighted with thicker border.
+
+    Parameters
+    ----------
+    edge_mode : str
+        String contains currenty selected edge mode for coin-view. Is either front, back or both.
+
+    Returns
+    -------
+    list of dict
+        List of cytoscape stylesheet rule dictionaries for the coin-view.
     """
+
     styles = [
         {'selector': 'node', 'style': {'label': 'data(label)', 'width': 200, 'height': 200,'border-width': 4, 'border-color': 'black'}},
         {
@@ -81,7 +132,6 @@ def base_stylesheet_coins(edge_mode='front'):
             }
         }
 
-#MERGE remove both
     if edge_mode == 'front':
         styles.append(_img_rule('bg_front'))
 
@@ -89,9 +139,9 @@ def base_stylesheet_coins(edge_mode='front'):
         styles.append(_img_rule('bg_back'))
     else:
         # mode == 'both': lowest → highest priority (later wins)
-        styles.append(_img_rule('bg_back'))   # fallback 3
-        styles.append(_img_rule('bg_front'))  # fallback 2
-        styles.append(_img_rule('bg_split'))  # preferred 1
+        styles.append(_img_rule('bg_back'))   # fallback 2
+        styles.append(_img_rule('bg_front'))  # fallback 1
+        styles.append(_img_rule('bg_split'))  # preferred
 
     return styles
 
@@ -99,7 +149,23 @@ def base_stylesheet_coins(edge_mode='front'):
 def set_hiding_rules(filter_store, skip_coins, skip_dies):
     """
     Helper to build cytoscape stylesheet rules for hiding specific nodes
+
+    Parameters
+    ----------
+    filter_store : dict or None
+        Contains mapping from attribute name to list of values.
+    skip_coins : list of str or None
+        List of strings, where every str is the coin_id of a coin. These are supposed to be skipped while creating the die-graph.
+    skip_dies : list of dict or None
+        List of die dictionaries, where every die dictionary represents a die with keys id and typ.
+        These are supposed to be skipped while creating the die-graph.
+
+    Returns
+    -------
+    list of dict
+        A list of Cytoscape stylesheet rule dictionaries that set display: none for matching nodes.
     """
+
     hiding_rules = []
 
     # hide nodes based on selection
@@ -121,20 +187,44 @@ def set_hiding_rules(filter_store, skip_coins, skip_dies):
 
     return hiding_rules
 
+
 def set_color_rules(color_values_list, color_ids):
     """
-    Helper to build cytoscape stylesheet rules
+    Helper to build cytoscape stylesheet rules for coloring specific nodes
+
+    Each entry in ``color_values_list`` describes a set of attribute
+    conditions, and the corresponding entry in ``color_ids`` provides
+    the color to use. For each pair, a selector is constructed and a
+    border color is applied.
+
+    Parameters
+    ----------
+    color_values_list : list of list of str
+        Each element in the list is a list of condition strings (looking like attr=value) for a particular color.
+        Nodes with the logical conjuction of attribute values should be colored.
+    color_ids : list of dict
+        List of dash component id's like where the index field contains the color name or hex code, which should be applied.
+
+    Returns
+    -------
+    list of dict
+        A list of Cytoscape stylesheet rule dictionaries that set bordercolor for matching nodes.
     """
+
     color_rules = []
-    # color rules (attr names are normalized; values may have spaces/umlauts)
+    # iterate over both lists in parallel, each pair represents one dropdown
     for color_values, id_ in zip(color_values_list or [], color_ids or []):
+        # extract index field, which stores the color
         color = id_.get('index') if isinstance(id_, dict) else None
         if not color or not color_values:
             continue
+
         selector = 'node'
-        for cond in color_values:
-            if isinstance(cond, str) and '=' in cond:
-                attr, val = cond.split('=', 1)   # attr is normalized
+        # build up selector by adding filters
+        for condition in color_values:
+            if isinstance(condition, str) and '=' in condition:
+                # split up attribute value pairs
+                attr, val = condition.split('=', 1)   # attr is normalized
                 selector += f"[{attr}='{css_escape(val)}']"
         color_rules.append({
             'selector': selector,

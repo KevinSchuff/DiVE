@@ -1,6 +1,11 @@
+"""
+This module provides image proxy endpoint. The /img_proxy route fetches remote images for the client to work around CORS restrictions.
+"""
+
 import requests
 from flask import request, Response, abort
 from urllib.parse import urlsplit, quote
+
 
 # Whitelist hosts
 ALLOWED_IMG_HOSTS = None
@@ -10,7 +15,26 @@ CONNECT_TIMEOUT = 5
 READ_TIMEOUT = 10
 
 def register_image_proxy(flask_app):
-    """"Registers a secure proxy route at /img_proxy."""
+    """
+    Registers a secure proxy route at /img_proxy in Flask app.
+    Endpoint accepts GET requests with query parameters url.
+    Fetches the remote image, downloads it and serves it to the client making the request.
+
+    Parameters
+    ----------
+    flask_app : Flask
+        Flask application instance, where the route will be registered.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    None   
+        This function itself does not raise expections, but created route may return HTTP 4xx or 5xx responses.
+    """
+
     @flask_app.get("/img_proxy")
     def img_proxy():
         url = request.args.get("url", "")
@@ -58,6 +82,20 @@ def register_image_proxy(flask_app):
         resp.headers["Cache-Control"] = "public, max-age=86400"
         return resp
 
-def proxify(url: str) -> str:
-    """Generates a local proxy URL for an image to bypass CORS restrictions(websites not allowing their images to be shown directly on other sites)"""
+
+def proxify(url):
+    """
+    Generates a local proxy URL for an image.
+
+    Parameters
+    ----------
+    url : str
+        Original remote image URL.
+
+    Returns
+    -------
+    str
+        URL pointing to the local proxy endpoint.
+    """
+
     return f"/img_proxy?url={quote(url, safe=':/%?&=')}"
