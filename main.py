@@ -28,7 +28,7 @@ app.layout = html.Div([
     dcc.Store(id='graph-store-dies'),
     dcc.Store(id='filter-values-store', data={}),
     dcc.Store(id='custom-colors-store', data=[]),
-    dcc.Store(id='layout-choices', data={'coins': 'cose-bilkent', 'dies': 'cose-bilkent'}),
+    dcc.Store(id='layout-choices', data={'coins': 'dagre', 'dies': 'dagre'}),
     dcc.Store(id='pending-csv', data=None),
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
@@ -67,7 +67,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='front-column',
                             type='text',
-                            placeholder='Stempeluntergruppe Av',
+                            placeholder='Please input the front die column name.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -77,7 +77,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='back-column',
                             type='text',
-                            placeholder='Stempeluntergruppe Rv',
+                            placeholder='Please input the back die column name.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -87,7 +87,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='front-url-column',
                             type='text',
-                            placeholder='Vorderseite Bild',
+                            placeholder='Please input the front picture column name.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -97,7 +97,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='back-url-column',
                             type='text',
-                            placeholder='Rückseite Bild',
+                            placeholder='Please input the back picture column name.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -172,7 +172,7 @@ app.layout = html.Div([
                     {'label': 'circle', 'value': 'circle'},
                     {'label': 'concentric', 'value': 'concentric'},
                 ],
-                value='cose-bilkent',
+                value='dagre',
                 clearable=False,
                 style={'marginBottom': '10px'}
             ),
@@ -307,7 +307,7 @@ app.layout = html.Div([
             # Two Cytoscape instances kept mounted; we toggle visibility only
             cyto.Cytoscape(
             id='cy-coins',
-            layout={'name': 'cose'},
+            layout={'name': 'dagre'},
             autoRefreshLayout = False,  # disables applying layout on elements change
             style={'width': '100%', 'height': '100%', 'display': 'block'},
             elements=[],
@@ -317,7 +317,7 @@ app.layout = html.Div([
             ),
             cyto.Cytoscape(
             id='cy-dies',
-            layout={'name': 'cose'},
+            layout={'name': 'dagre'},
             autoRefreshLayout = False,
             style={'width': '100%', 'height': '100%', 'display': 'none'},
             elements=[],

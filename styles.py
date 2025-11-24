@@ -120,13 +120,12 @@ def base_stylesheet_coins(edge_mode='front'):
         {'selector': ':selected', 'style': {'border-width': 8, "background-color": "#999"}},     # change styling of node selection
     ]
 
-    # Common visual for image nodes
     def _img_rule(key: str):
         return {
             'selector': f'node[{key}]',
             'style': {
                 'background-image': f'data({key})',
-                'background-fit': 'contain',   # keep full coin visible
+                'background-fit': 'cover',   # keep full coin visible
                 'background-clip': 'node',
                 'background-opacity': 1,
             }
@@ -191,11 +190,9 @@ def set_hiding_rules(filter_store, skip_coins, skip_dies):
 def set_color_rules(color_values_list, color_ids):
     """
     Helper to build cytoscape stylesheet rules for coloring specific nodes
-
-    Each entry in ``color_values_list`` describes a set of attribute
-    conditions, and the corresponding entry in ``color_ids`` provides
-    the color to use. For each pair, a selector is constructed and a
-    border color is applied.
+    Each entry in color_values_list is a List of attribute=value pairs with the intended color 
+    stored in color_ids. For each combination of List of pairs and color, a selector is constructed 
+    and border color set.
 
     Parameters
     ----------
@@ -203,12 +200,13 @@ def set_color_rules(color_values_list, color_ids):
         Each element in the list is a list of condition strings (looking like attr=value) for a particular color.
         Nodes with the logical conjuction of attribute values should be colored.
     color_ids : list of dict
-        List of dash component id's like where the index field contains the color name or hex code, which should be applied.
+        List of dash component id's like {'type':..., 'index': color name}, where value stored under index key is
+        the color name or hex code that should be applied.
 
     Returns
     -------
     list of dict
-        A list of Cytoscape stylesheet rule dictionaries that set bordercolor for matching nodes.
+        A list of Cytoscape stylesheet rule dictionaries that set border color for matching nodes.
     """
 
     color_rules = []
@@ -220,11 +218,11 @@ def set_color_rules(color_values_list, color_ids):
             continue
 
         selector = 'node'
-        # build up selector by adding filters
+        # build up attribute selector by adding each attribute=value pair
         for condition in color_values:
             if isinstance(condition, str) and '=' in condition:
                 # split up attribute value pairs
-                attr, val = condition.split('=', 1)   # attr is normalized
+                attr, val = condition.split('=', 1)
                 selector += f"[{attr}='{css_escape(val)}']"
         color_rules.append({
             'selector': selector,

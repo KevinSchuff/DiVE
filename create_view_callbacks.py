@@ -168,22 +168,22 @@ def register_create_view_callbacks(app):
         
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        G = load_graph_from_csv(decoded)
+        coins_graph = load_graph_from_csv(decoded)
 
         # Normalize the user-provided (or default) column names
-        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
-        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
-        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
+        front_key = normalize_key(front_column or "front die")
+        back_key = normalize_key(back_column or "back die")
+        front_url_key = normalize_key(front_url_column or "front img")
+        back_url_key = normalize_key(back_url_column or "back img")
 
         # build edges according to selected mode
-        add_edges_by_mode(G, front_key, back_key, edge_mode)
+        add_edges_by_mode(coins_graph, front_key, back_key, edge_mode)
 
-        # {attribute -> {values}} for filter dropdown
+        # maps each attribute to all its values like {attribute -> set(values)} for filter dropdown
         attribute_values = dict()
-        #set of "attribute=value" strings for color dropdown
+        # set of  all "attribute=value" strings for color dropdown
         combinations = set()
-        for _, data in G.nodes(data=True):
+        for _, data in coins_graph.nodes(data=True):
             for attribute, value in data.items():
                 if value is not None:
                     attribute_values.setdefault(attribute, set()).add(value)
@@ -198,29 +198,28 @@ def register_create_view_callbacks(app):
                     options=[{'label': str(val), 'value': str(val)} for val in sorted(vals)],
                     multi=True,
                     searchable=True,
-                    placeholder=f"Search {attr} value",
-                    style={'margin-bottom': '10px'}
+                    placeholder=f"Search {attr} value"
                 )
             ])
             for attr, vals in attribute_values.items()
         ]
-
+        # build options for color dropdowns, expects [{'label':displayed text, 'value':returned value}]
         options = [{'label': c, 'value': c} for c in sorted(combinations)]
 
         # build die-graph with input columns
         dies_graph, _ = create_dies_graph(
-            G, front_col=front_key, back_col=back_key, hidden_coins=[], hidden_dies=[],
+            coins_graph, front_col=front_key, back_col=back_key, hidden_coins=[], hidden_dies=[],
             front_url_col=front_url_key, back_url_col=back_url_key
             )
 
         # cytoscape elements for graphs
-        coins_base_elements = nx_to_elements(G)             # base (no images)
+        coins_base_elements = nx_to_elements(coins_graph)             # base (no images)
         dies_elements = nx_to_elements(dies_graph)
 
-        coins_with_images_elements = enrich_images(G, coins_base_elements, front_url_key, back_url_key)
+        coins_with_images_elements = enrich_images(coins_graph, coins_base_elements, front_url_key, back_url_key)
 
         return (
-            nx.readwrite.json_graph.node_link_data(G),
+            nx.readwrite.json_graph.node_link_data(coins_graph),
             nx.readwrite.json_graph.node_link_data(dies_graph),
             coins_with_images_elements,
             dies_elements,

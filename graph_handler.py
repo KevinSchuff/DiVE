@@ -3,9 +3,10 @@ This module handles all interaction with the graphstructures and related helper 
 """
 
 import networkx as nx
+from urllib.parse import urlencode
 
 from csv_handler import bg_url_from_csv_value
-from urllib.parse import urlencode
+
 
 
 def remove_duplicate_dies(dies):
@@ -32,7 +33,8 @@ def remove_duplicate_dies(dies):
 
 def add_edges_by_mode(G, front_key, back_key, mode = 'both'):
     """
-    Adds edges in coin-graph based on matching dies and depending on selected edge mode.
+    Adds edges in coin-graph based on selected edge mode. Iterates over all node pairs and depending on
+    on edge mode, checks the relevant front die and/or back die attributes, if they match it adds an edge.
 
     Parameters
     ----------
@@ -65,7 +67,8 @@ def add_edges_by_mode(G, front_key, back_key, mode = 'both'):
             # extract relevant attributes from node v
             front_v = str(v_dict.get(front_key, "")).strip()
             back_v = str(v_dict.get(back_key, "")).strip()
-
+            
+            # add edge between nodes, if attribute from associated mode matches
             if mode == 'front' and front_u and front_u == front_v:
                 G.add_edge(u_id, v_id, attr='same_front', label=front_u)
             elif mode == 'back' and back_u and back_u == back_v:
@@ -119,21 +122,20 @@ def create_dies_graph(coin_graph, front_col, back_col, hidden_coins=None, hidden
         coin_id = str(node_id)
         front_die = data.get(front_col)
         back_die = data.get(back_col)
-        # add coin's back die, to die graph
+        # create bool if die should be skipped
         skip_front_die = (not front_die) or (front_die in skip_dies) 
         skip_back_die = (not back_die) or (back_die in skip_dies) 
 
         if not skip_front_die:
-            if front_die not in skip_dies:
-                if front_die not in die_graph:
-                    die_graph.add_node(front_die, typ=front_col, coin_ids=set())
-                die_graph.nodes[front_die]["coin_ids"].add(coin_id)
-                # assign image once if available
-                if front_url_col and data.get(front_url_col) and "bg_die" not in die_graph.nodes[front_die]:
-                    bg = bg_url_from_csv_value(data.get(front_url_col))
-                    if bg:
-                        die_graph.nodes[front_die]["bg_die"] = bg
-        # add coin's back die to die graph
+            if front_die not in die_graph:
+                die_graph.add_node(front_die, typ=front_col, coin_ids=set())
+            die_graph.nodes[front_die]["coin_ids"].add(coin_id)
+            # assign image once if available
+            if front_url_col and data.get(front_url_col) and "bg_die" not in die_graph.nodes[front_die]:
+                bg = bg_url_from_csv_value(data.get(front_url_col))
+                if bg:
+                    die_graph.nodes[front_die]["bg_die"] = bg
+
         if not skip_back_die:
             if back_die not in die_graph:
                 die_graph.add_node(back_die, typ=back_col, coin_ids=set())

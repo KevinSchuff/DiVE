@@ -50,8 +50,7 @@ def register_image_proxy(flask_app):
             abort(403, "host not allowed")
 
         try:
-            # get img request
-            r = requests.get(
+            image_host_response = requests.get(
                 url, stream=True, allow_redirects=True,
                 timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)
             )
@@ -59,18 +58,18 @@ def register_image_proxy(flask_app):
             abort(502, f"fetch error: {e}")
 
         # only continue if request worked
-        if r.status_code != 200:
-            abort(r.status_code)
+        if image_host_response.status_code != 200:
+            abort(image_host_response.status_code)
 
         # make sure it is an image
-        ct = (r.headers.get("Content-Type") or "").lower()
+        ct = (image_host_response.headers.get("Content-Type") or "").lower()
         if not ct.startswith("image/"):
             abort(415, "unsupported media type")
 
-        # read image date in chucks (avoids large memory use) 
+        # read image data in chucks (avoids large memory use) 
         data = b""
         total = 0
-        for chunk in r.iter_content(64 * 1024):
+        for chunk in image_host_response.iter_content(64 * 1024):
             if not chunk:
                 continue
             total += len(chunk)
@@ -78,9 +77,9 @@ def register_image_proxy(flask_app):
                 abort(413, "image too large")
             data += chunk
 
-        resp = Response(data, mimetype=ct or "image/jpeg")
-        resp.headers["Cache-Control"] = "public, max-age=86400"
-        return resp
+        proxy_response = Response(data, mimetype=ct or "image/jpeg")
+        proxy_response.headers["Cache-Control"] = "public, max-age=86400"  # browser stores image for 24hrs
+        return proxy_response
 
 
 def proxify(url):

@@ -68,10 +68,10 @@ def register_update_view_callbacks(app):
         # Remove all existing edges and rebuild according to radio selection
         G.remove_edges_from(G.edges())
 
-        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
-        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
-        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
+        front_key = normalize_key(front_column or "front die")
+        back_key = normalize_key(back_column or "back die")
+        front_url_key = normalize_key(front_url_column or "front img")
+        back_url_key = normalize_key(back_url_column or "back img")
 
         add_edges_by_mode(G, front_key, back_key, edge_mode)
 
@@ -255,22 +255,22 @@ def register_update_view_callbacks(app):
         if not graph_data_coins:
             return no_update, no_update, no_update, no_update, no_update
         # rebuild networkX graph from stored graph structure
-        G_coins_full = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
+        coin_graph_full = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
         # prepare column names
-        front_key = normalize_key(front_column or "Stempeluntergruppe Av")
-        back_key = normalize_key(back_column or "Stempeluntergruppe Rv")
-        front_url_key = normalize_key(front_url_column or "Vorderseite Bild")
-        back_url_key = normalize_key(back_url_column or "Rueckseite Bild")
+        front_key = normalize_key(front_column or "front die")
+        back_key = normalize_key(back_column or "back die")
+        front_url_key = normalize_key(front_url_column or "front img")
+        back_url_key = normalize_key(back_url_column or "back img")
 
         # apply attribute based filter to coin graph
-        hide_nodes_attr = set()
+        hide_nodes_by_attr = set()
         if filter_store:
             for attr, values in filter_store.items():
-                for n, d in G_coins_full.nodes(data=True):
-                    if attr in d and str(d[attr]) in values:
-                        hide_nodes_attr.add(n)
-        visible_coins = [n for n in G_coins_full.nodes if n not in hide_nodes_attr]
-        G_coins_visible = G_coins_full.subgraph(visible_coins).copy()
+                for node_id, node_data in coin_graph_full.nodes(data=True):
+                    if attr in node_data and str(node_data[attr]) in values:
+                        hide_nodes_by_attr.add(node_id)
+        visible_coins = [node_id for node_id in coin_graph_full.nodes if node_id not in hide_nodes_by_attr]
+        coin_graph_filtered = coin_graph_full.subgraph(visible_coins).copy()
         
         # get stored hidden coin ids and dies
         hidden_store = hidden or {}
@@ -297,7 +297,7 @@ def register_update_view_callbacks(app):
         elif ctx.triggered_id == "show-only-selection-button":
             if view == 'coins':
                 # nodes currently visible after attribute-based filter
-                visible_coin_ids = {str(n) for n in G_coins_visible.nodes}
+                visible_coin_ids = {str(n) for n in coin_graph_filtered.nodes}
                 selection_ids = {str(d["id"]) for d in (selected_nodes_coins or []) if isinstance(d, dict) and "id" in d}
                 not_selected_coins = visible_coin_ids - selection_ids
                 # set union of store and not selected coins
@@ -314,7 +314,7 @@ def register_update_view_callbacks(app):
                 not_selected_dies_ids = visible_die_ids - selection_ids
                 # convert to dies obj with id and typ
                 new_hidden_dies_obj = []
-                # build die objexts for all not selected dies, that now should be hidden
+                # build die objects for all not selected dies, that now should be hidden
                 for el in (dies_elements_current or []):
                     if "id" in el.get("data", {}):
                         data = el.get("data", {})
@@ -330,23 +330,23 @@ def register_update_view_callbacks(app):
         
         # rebuild die-graph without hidden coins/dies (attribute based filtering + selection based)
         all_hidden_dies_ids = [d["id"] for d in all_hidden_dies_objs]
-        updated_die_graph, biggest_edge_weight = create_dies_graph(G_coins_visible, front_key, back_key, all_hidden_coins_ids, all_hidden_dies_ids, front_url_key, back_url_key)
+        updated_die_graph, biggest_edge_weight = create_dies_graph(coin_graph_filtered, front_key, back_key, all_hidden_coins_ids, all_hidden_dies_ids, front_url_key, back_url_key)
 
         # build stylesheet rules for both views
         color_rules = set_color_rules(color_values_list, color_ids)
         hiding_rules = set_hiding_rules(filter_store, all_hidden_coins_ids, all_hidden_dies_objs)
         # append basestylesheets
-        ss_coins = base_stylesheet_coins(edge_mode) + color_rules + hiding_rules
+        stylesheet_coins = base_stylesheet_coins(edge_mode) + color_rules + hiding_rules
         if 'on' in scale_weighted_edges:
-            ss_dies = base_stylesheet_dies(True, biggest_edge_weight) + color_rules + hiding_rules
+            stylesheet_dies = base_stylesheet_dies(True, biggest_edge_weight) + color_rules + hiding_rules
         else:
-            ss_dies = base_stylesheet_dies(False) + color_rules + hiding_rules
+            stylesheet_dies = base_stylesheet_dies(False) + color_rules + hiding_rules
 
         # compute stats
-        count_coins = G_coins_visible.number_of_nodes() - len(all_hidden_coins_ids)
+        count_coins = coin_graph_filtered.number_of_nodes() - len(all_hidden_coins_ids)
         count_dies = updated_die_graph.number_of_nodes()
         if view == 'coins':
-            components = nx.number_connected_components(G_coins_visible) if count_coins else 0
+            components = nx.number_connected_components(coin_graph_filtered) if count_coins else 0
         else:
             components = nx.number_connected_components(updated_die_graph) if count_dies else 0
 
@@ -374,7 +374,7 @@ def register_update_view_callbacks(app):
             "dies": [],
             }
 
-        return ss_coins, ss_dies, stats_children, nx_to_elements(updated_die_graph), hidden_out
+        return stylesheet_coins, stylesheet_dies, stats_children, nx_to_elements(updated_die_graph), hidden_out
 
 
     @app.callback(

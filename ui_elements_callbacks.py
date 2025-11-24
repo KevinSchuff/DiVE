@@ -70,7 +70,7 @@ def register_ui_elements_callbacks(app):
         """
         
         choices = choices or {}
-        return choices.get(active_view, 'cose-bilkent')
+        return choices.get(active_view, 'dagre')
 
 
     @app.callback(
