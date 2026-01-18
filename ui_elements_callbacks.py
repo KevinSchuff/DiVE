@@ -420,16 +420,22 @@ def register_ui_elements_callbacks(app):
     @app.callback(
         Output('start-app-overlay', 'style'),
         Input('upload-data', 'contents'),
+        Input('upload-new-csv', 'n_clicks'),
+        Input('start-app-overlay-close-btn', 'n_clicks'),
         prevent_initial_call=False
     )
-    def close_start_app_overlay(upload_data):
+    def close_start_app_overlay(upload_data, upload_new_csv_clicks, start_app_overlay_close_btn):
         """
-        Hide the start-app overlay after data upload.
+        Handles visibility of start app overlay.
 
         Parameters
         ----------
         upload_data : str or None
             base64 encoded string containing uploaded CSV file's content
+        upload_new_csv_clicks : int or None
+            Number of times the "upload new csv" button has been clicked.
+        start_app_overlay_close_btn : int or None
+            Number of times the "start app overlay close" button has been clicked.  
 
         Returns
         -------
@@ -437,7 +443,60 @@ def register_ui_elements_callbacks(app):
             CSS Style dict for start-app-overlay.
         """
 
-        if upload_data is not None:
+        trigger = ctx.triggered_id
+
+        if trigger == 'upload-new-csv':
+            return {
+                'position': 'fixed',
+                'inset': 0,
+                'backgroundColor': 'rgba(0,0,0,0.6)',
+                'zIndex': 10000,
+                'display': 'flex',
+                'justifyContent': 'center',
+                'alignItems': 'center',
+                'padding': '24px'
+                }
+        elif (upload_data is not None) or (trigger == 'start-app-overlay-close-btn'):
             return {'display': 'none'}
         else:
             return no_update
+
+
+    @app.callback(
+        Output('about-overlay', 'style'),
+        Input("about-btn", "n_clicks"),
+        Input("about-close-btn", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def handle_about_overlay(about_btn, about_close_btn):
+        """
+        Handles visibility of about overlay.
+
+        Parameters
+        ----------
+        about_btn : int or None
+            Number of times the "About" button has been clicked.
+        about_close_btn : int or None
+            Number of times the "close about" button has been clicked.
+
+        Returns
+        -------
+        dict or dash.no_update
+            CSS Style dict for about-overlay.
+        """
+
+        trigger = ctx.triggered_id
+
+        if trigger == 'about-btn':
+            return {
+                'position': 'fixed',
+                'inset': 0,
+                'backgroundColor': 'rgba(0,0,0,0.6)',
+                'zIndex': 10000,
+                'display': 'flex',
+                'justifyContent': 'center',
+                'alignItems': 'center',
+                'padding': '24px'
+                }
+        else:
+            return {"display": "none"}

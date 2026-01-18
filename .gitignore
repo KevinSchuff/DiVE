@@ -38,3 +38,4 @@ test.csv
 
 assets/*
 !assets/.gitkeep
+!assets/style.css

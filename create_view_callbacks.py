@@ -117,6 +117,9 @@ def register_create_view_callbacks(app):
         Output({'type': 'color-dropdown', 'index': 'red'}, 'options'),
         Output({'type': 'color-dropdown', 'index': 'blue'}, 'options'),
         Output({'type': 'color-dropdown', 'index': 'green'}, 'options'),
+        Output({'type': 'color-dropdown', 'index': 'red'}, 'value'),
+        Output({'type': 'color-dropdown', 'index': 'blue'}, 'value'),
+        Output({'type': 'color-dropdown', 'index': 'green'}, 'value'),
         Input('csv-approved', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
@@ -161,10 +164,16 @@ def register_create_view_callbacks(app):
             Contains dropdown options with all possible attribute:value combinations for blue coloring.
         list of dict  
             Contains dropdown options with all possible attribute:value combinations for green coloring.
+        list of dict 
+            Contains dropdown selection for red coloring.
+        list of dict  
+            Contains dropdown selection for blue coloring.
+        list of dict  
+            Contains dropdown selection for green coloring.
         """
 
         if not contents:
-            return (no_update, no_update, no_update, no_update, [], [], [], [])
+            return (no_update, no_update, no_update, no_update, [], [], [], [], None, None, None)
         
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
@@ -226,6 +235,9 @@ def register_create_view_callbacks(app):
             filter_ui,
             options,
             options,
-            options
+            options,
+            None,
+            None,
+            None
         )
 

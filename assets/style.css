@@ -1,0 +1,20 @@
+body {
+    font-family: "Segoe UI", sans-serif;
+}
+
+button {
+    font: inherit;
+    background-color: #004A6F;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 4px;
+}
+
+button:hover {
+    background-color: #0072A6;
+}
+
+button:disabled {
+    background-color: darkgrey;
+}

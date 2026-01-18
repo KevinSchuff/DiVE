@@ -53,12 +53,27 @@ app.layout = html.Div([
                 'maxWidth': '600px',
                 'width': '100%',
                 'border': '2px solid black',
-                'borderRadius': '12px'
+                'borderRadius': '12px',
+                'position': 'relative',
             },
             children=[
+                html.Button(
+                    "✕", id='start-app-overlay-close-btn', n_clicks=0,
+                    style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px', 'fontWeight': 'bold', 'backgroundColor': 'red',}
+                    ),
                 html.H1("Welcome to DiVE"),
                 html.H3("DieLink Visualization Environment"),
-                html.H4("Please enter the corresponding field names, then choose a CSV file."),
+                html.P(
+                    [
+                        "DiVE accepts a labeled list of coins as a .csv file.",
+                        html.Br(),
+                        "Each row represents one coin with die assignments and optional image URLs",
+                        html.Br(),
+                        "Rename or enter the relevant column names below.",
+                        html.Br(),
+                        "Then select the .csv file.",
+                    ]
+                ),
 
                 # User Inputs for Column names
                 html.Div([
@@ -67,7 +82,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='front-column',
                             type='text',
-                            placeholder='Please input the front die column name.',
+                            placeholder='Rename related column name to "front die" or enter it here.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -77,7 +92,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='back-column',
                             type='text',
-                            placeholder='Please input the back die column name.',
+                            placeholder='Rename related column name to "back die" or enter it here.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -87,7 +102,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='front-url-column',
                             type='text',
-                            placeholder='Please input the front picture column name.',
+                            placeholder='Rename related column name to "front img" or enter it here.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -97,7 +112,7 @@ app.layout = html.Div([
                         dcc.Input(
                             id='back-url-column',
                             type='text',
-                            placeholder='Please input the back picture column name.',
+                            placeholder='Rename related column name to "back img" or enter it here.',
                             debounce=True,
                             style={'width': '100%'}
                         ),
@@ -114,6 +129,27 @@ app.layout = html.Div([
 
             ]
         ),
+    ),
+
+    html.Div(
+        id="about-overlay",
+        style={"display": "none", "position": "fixed", "inset": 0, "background": "rgba(0,0,0,0.6)",},
+        children=html.Div(
+            [
+                html.Div(
+                [
+                    html.H3("About DiVE", style={"margin": 0}),
+                    html.Button("X", id="about-close-btn", n_clicks=0, style={"marginLeft": "auto", 'fontWeight': 'bold', 'backgroundColor': 'red',},),
+                ],
+                style={"display": "flex", "alignItems": "center", "marginBottom": "16px",},
+            ),
+                html.Div("Version: 1.0"),
+                html.Div("Author: Kevin Schuff"),
+                html.Div("Latest version and test.csv file on GitHub."),
+                html.A("Open GitHub", href="https://github.com/KevinSchuff/DiVE", target="_blank")
+            ],
+            style={"background": "white", "padding": "24px", 'border': '2px solid black','borderRadius': '12px', 'width': '300px'},
+        )
     ),
 
 
@@ -138,20 +174,38 @@ app.layout = html.Div([
         ])
     ),
 
-    # Graph View-Selector
-    html.Div([
-    dcc.RadioItems(
-        id='graph-view-selector',
-        options=[
-            {'label': 'Coin-View', 'value': 'coins'},
-            {'label': 'Die-View', 'value': 'dies'}
+    
+    # Topbar
+    html.Div(
+        [
+            # new csv button
+            html.Div(
+                [
+                    html.Button("Upload new CSV", id="upload-new-csv", n_clicks=0)
+                ], style={"flex":"0 0 auto"},
+            ),
+            # Graph View-Selector
+            html.Div([
+                dcc.RadioItems(
+                    id='graph-view-selector',
+                    options=[
+                        {'label': html.Strong('Coin-View'), 'value': 'coins'},
+                        {'label': html.Strong('Die-View'), 'value': 'dies'}
+                    ],
+                    value='coins',
+                    inline=True
+                ),
+            ], style={"flex": "1", "display": "flex", "justifyContent": "center"}),
+                        # new csv button
+            html.Div(
+                [
+                    html.Button("About", id="about-btn", n_clicks=0)
+                ], style={"flex":"0 0 auto"},
+            ),
         ],
-        value='coins',
-        inline=True
+        style={"display": "flex"}
     ),
-    html.Hr()
-    ], style={'textAlign': 'center',}),
-
+    html.Hr(),
 
     # Sidebar and Visualizations
     html.Div([
@@ -237,12 +291,12 @@ app.layout = html.Div([
                         dcc.Input(
                             id='new-color-input',
                             type='text',
-                            placeholder='Color name or #hexcode',
+                            placeholder='Enter color name or #hexcode',
                             debounce=True,
-                            style={'width': '70%', 'marginRight': '10px'}
+                            style={'flex': '1', 'marginRight': '4px'}
                         ),
                         html.Button('+', id='add-color-button', n_clicks=0),
-                    ], style={'marginBottom': '15px'}),
+                    ], style={'display': 'flex', 'width': '100%', 'marginBottom': '15px'}),
                     html.Div(id='custom-color-dropdowns'),
                 ],
             ),
@@ -253,11 +307,20 @@ app.layout = html.Div([
                 children=[
                     html.Hr(),
                     html.H3("Hide Nodes"),
-                    html.Div(html.Label("by selection:", style={'fontWeight': 'bold'}), style={'marginBottom': '10px'}),
-                    html.Div(html.Label("use box selection: shift + left-click + drag")),
-                    html.Button("Hide Selection", id='hide-selection-button', title='hides all selected nodes',  n_clicks=0, style={'marginRight': '5px'}),
-                    html.Button("Show only Selection", id='show-only-selection-button', title='hides all nodes not in selection', n_clicks=0, style={'marginRight': '5px'}),
-                    html.Button("Reset Selection", id="reset-selection-button", title='resets selection based hiding', n_clicks=0, disabled=True),
+                    html.Div(html.Label("by selection:", style={'fontWeight': 'bold'})),
+                    html.Div(html.Label("use box selection: shift + left-click + drag"), style={'marginBottom': '4px'}),
+                    html.Div(
+                        [
+                            html.Button("Hide Selection", id='hide-selection-button', title='hides all selected nodes', n_clicks=0),
+                            html.Button("Show only Selection", id='show-only-selection-button', title='hides all nodes not in selection', n_clicks=0),
+                            html.Button("Reset Selection", id="reset-selection-button", title='resets selection based hiding', n_clicks=0, disabled=True),
+                        ],
+                        style={
+                            'display': 'flex',
+                            'justifyContent': 'space-evenly',
+                            'width': '100%',
+                        }
+                    ),
                     html.Div(html.Label("by attribute value:", style={'fontWeight': 'bold'}), style={'marginTop': '20px', 'marginBottom': '10px'}),
                     html.Div(id='filter-dropdowns'),
                 ],
@@ -269,9 +332,10 @@ app.layout = html.Div([
             html.Div(id='node-info-box', style={
                 'padding': '10px',
                 'border': '1px solid #ccc',
+                'borderRadius': '4px',
                 'maxHeight': '200px',
                 'overflowY': 'auto',
-                'backgroundColor': '#f9f9f9'
+                'backgroundColor': '#C6E2F7'
             }),
 
             # Statistics
@@ -282,9 +346,10 @@ app.layout = html.Div([
                 style={
                     'padding': '10px',
                     'border': '1px solid #ccc',
+                    'borderRadius': '4px',
                     'maxHeight': '160px',
                     'overflowY': 'auto',
-                    'backgroundColor': '#f9f9f9',
+                    'backgroundColor': '#C6E2F7',
                     'marginTop': '6px'
                 }
             ),

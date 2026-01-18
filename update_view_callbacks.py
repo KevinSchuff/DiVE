@@ -167,6 +167,7 @@ def register_update_view_callbacks(app):
         Output('stats-box', 'children'),
         Output('cy-dies', 'elements', allow_duplicate=True),
         Output('hidden-store', 'data'),
+        Input('upload-new-csv', 'n_clicks'),
         Input('show-only-selection-button', 'n_clicks'),
         Input('hide-selection-button', 'n_clicks'),
         Input('reset-selection-button', 'n_clicks'),
@@ -188,7 +189,7 @@ def register_update_view_callbacks(app):
         State('cy-dies', 'elements'),   
         prevent_initial_call=True
     )
-    def update_styles_and_stats(show_click, hide_click, unhide_click, view, color_values_list, filter_store,
+    def update_styles_and_stats(upload_new_csv_click, show_click, hide_click, unhide_click, view, color_values_list, filter_store,
                                 edge_mode, scale_weighted_edges, color_ids, graph_data_coins, graph_data_dies,
                                 front_column, back_column, front_url_column, back_url_column, selected_nodes_coins,
                                 selected_nodes_dies, hidden, dies_elements_current):
@@ -198,6 +199,8 @@ def register_update_view_callbacks(app):
 
         Parameters
         ----------
+        upload_new_csv_click : int or None
+            Number of clicks on the 'upload new csv' button.
         show_click : int or None
             Number of clicks on the 'show only selection' button.
         hide_click : int or None
@@ -254,6 +257,8 @@ def register_update_view_callbacks(app):
         # if no coin graph exists yet, nothing can be updated
         if not graph_data_coins:
             return no_update, no_update, no_update, no_update, no_update
+        if ctx.triggered_id == "upload-new-csv":
+            return no_update, no_update, no_update, no_update, {"coins": [], "dies": []}
         # rebuild networkX graph from stored graph structure
         coin_graph_full = nx.readwrite.json_graph.node_link_graph(graph_data_coins)
         # prepare column names
