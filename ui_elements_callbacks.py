@@ -500,3 +500,28 @@ def register_ui_elements_callbacks(app):
                 }
         else:
             return {"display": "none"}
+
+
+    @app.callback(
+        Output("upload-container", "children"),
+        Input("upload-signal", "data"),
+    )
+    def render_upload(upload_signal):
+        """
+        Renders new upload component on upload
+
+        Parameters
+        ----------
+        upload_signal : int
+            Changes on csv upload
+
+        Returns
+        -------
+        Component
+            Dash Upload component rendered inside the upload container.
+        """
+        return dcc.Upload(
+            id="upload-data",
+            children=html.Button("Choose CSV", style={'margin': '10px'}),
+            multiple=False,
+            )

@@ -17,14 +17,16 @@ def register_create_view_callbacks(app):
     @app.callback(
         Output('csv-approved', 'data'),
         Output('pending-csv', 'data'),
-        Output('csv-size-warning', 'displayed'),            
-        Input('upload-data', 'contents'),                       
-        Input('csv-size-warning', 'submit_n_clicks'),           # OK button
-        Input('csv-size-warning', 'cancel_n_clicks'),           # Cancel button
+        Output('csv-size-warning', 'displayed'),
+        Output('upload-signal', 'data'),
+        Input('upload-data', 'contents'),
+        Input('csv-size-warning', 'submit_n_clicks'),
+        Input('csv-size-warning', 'cancel_n_clicks'),
         State('pending-csv', 'data'),
+        State('upload-signal', 'data'),
         prevent_initial_call=True
     )
-    def gate_and_decide(contents, ok_clicks, cancel_clicks, pending):
+    def gate_and_decide(contents, ok_clicks, cancel_clicks, pending, upload_signal):
         """
         This callback gatekeeps larger csv files. if it is < 100 rows accept immediately, else stash in pending-csv and show dialogue box.
 
@@ -51,6 +53,7 @@ def register_create_view_callbacks(app):
 
         # check which input triggered
         trig = ctx.triggered_id
+        upload_signal = upload_signal or 0
 
         # csv was uploaded -> count lines and decide to show dialogue box
         if trig == 'upload-data' and contents:
@@ -66,20 +69,20 @@ def register_create_view_callbacks(app):
 
             # if uploaded csv too big, stash csv and show dialogue box
             if n_rows <= 100:
-                return contents, None, False
+                return contents, None, False, upload_signal + 1
             else:
-                return None, contents, True
+                return None, contents, True, upload_signal
 
         # user clicked OK in dialogue box -> use full csv
         if trig == 'csv-size-warning' and ok_clicks:
             if pending:
-                return pending, None, False
-            return no_update, None, False
+                return pending, None, False, upload_signal + 1
+            return no_update, None, False, upload_signal
 
         # user clicked Cancel in dialogue box -> use first 100 lines
         if trig == 'csv-size-warning' and (cancel_clicks is not None):
             if not pending:
-                return no_update, None, False
+                return no_update, None, False, upload_signal
             # decode pending csv
             content_type, content_string = pending.split(',', 1)
             decoded = base64.b64decode(content_string)
@@ -103,9 +106,9 @@ def register_create_view_callbacks(app):
             reduced_b64 = base64.b64encode(reduced_text).decode('ascii')
             reduced_contents = f"data:text/csv;base64,{reduced_b64}"
 
-            return reduced_contents, None, False
+            return reduced_contents, None, False, upload_signal + 1
 
-        return no_update, no_update, False
+        return no_update, no_update, False, upload_signal
 
         
     @app.callback(
@@ -120,14 +123,16 @@ def register_create_view_callbacks(app):
         Output({'type': 'color-dropdown', 'index': 'red'}, 'value'),
         Output({'type': 'color-dropdown', 'index': 'blue'}, 'value'),
         Output({'type': 'color-dropdown', 'index': 'green'}, 'value'),
-        Input('csv-approved', 'data'),
+        Input('upload-signal', 'data'),
+        State('csv-approved', 'data'),
         State('front-column', 'value'),
         State('back-column', 'value'),
         State('front-url-column', 'value'),
         State('back-url-column', 'value'),
         State('edge-mode', 'value'),
+        prevent_initial_call=True
     )
-    def handle_file_upload(contents, front_column, back_column, front_url_column, back_url_column, edge_mode):
+    def handle_file_upload(upload_signal, contents, front_column, back_column, front_url_column, back_url_column, edge_mode):
         """
         Decodes CSV and builds coin graph and die graph. prepares filter und color options UI
 

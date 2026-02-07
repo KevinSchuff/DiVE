@@ -15,7 +15,8 @@ from ui_elements_callbacks import register_ui_elements_callbacks
 
 cyto.load_extra_layouts()
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
+
 # Get the Flask server instance
 server = app.server
 register_merge_route(server)
@@ -32,6 +33,9 @@ app.layout = html.Div([
     dcc.Store(id='pending-csv', data=None),
     dcc.Store(id='csv-approved', data=None),
     dcc.Store(id="hidden-store", data={"coins": [], "dies": []}), # stores list of coin ids(str), list of dies(obj with id and typ)
+    dcc.Store(id="upload-signal", data=0),
+    dcc.Upload(id="upload-data", style={"display": "none"}),
+
     
     # starting overlay
     html.Div(
@@ -119,13 +123,7 @@ app.layout = html.Div([
                     ], style={'marginBottom': '10px'}),
                 ], style={'marginTop': '10px'}),
 
-                html.Div([
-                    dcc.Upload(
-                        id='upload-data',
-                        children=html.Button("Choose CSV", style={'margin': '10px'}),
-                        multiple=False
-                    ),
-                ], style={'textAlign': 'center', 'marginTop': '20px'}),
+                html.Div(id="upload-container", style={"textAlign": "center"}),
 
             ]
         ),
