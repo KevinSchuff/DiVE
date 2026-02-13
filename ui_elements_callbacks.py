@@ -421,10 +421,11 @@ def register_ui_elements_callbacks(app):
         Output('start-app-overlay', 'style'),
         Input('upload-data', 'contents'),
         Input('upload-new-csv', 'n_clicks'),
+        Input('test-dive-button', 'n_clicks'),
         Input('start-app-overlay-close-btn', 'n_clicks'),
         prevent_initial_call=False
     )
-    def close_start_app_overlay(upload_data, upload_new_csv_clicks, start_app_overlay_close_btn):
+    def close_start_app_overlay(upload_data, upload_new_csv_clicks, test_dive_clicks, start_app_overlay_close_btn):
         """
         Handles visibility of start app overlay.
 
@@ -434,6 +435,8 @@ def register_ui_elements_callbacks(app):
             base64 encoded string containing uploaded CSV file's content
         upload_new_csv_clicks : int or None
             Number of times the "upload new csv" button has been clicked.
+        test_dive_clicks : int or None
+            Number of times the "test dive" button has been clicked.
         start_app_overlay_close_btn : int or None
             Number of times the "start app overlay close" button has been clicked.  
 
@@ -456,7 +459,7 @@ def register_ui_elements_callbacks(app):
                 'alignItems': 'center',
                 'padding': '24px'
                 }
-        elif (upload_data is not None) or (trigger == 'start-app-overlay-close-btn'):
+        elif (upload_data is not None) or (trigger == 'start-app-overlay-close-btn') or (trigger == 'test-dive-button'):
             return {'display': 'none'}
         else:
             return no_update
@@ -520,8 +523,14 @@ def register_ui_elements_callbacks(app):
         Component
             Dash Upload component rendered inside the upload container.
         """
-        return dcc.Upload(
-            id="upload-data",
-            children=html.Button("Choose CSV", style={'margin': '10px'}),
-            multiple=False,
-            )
+        return html.Div(
+            [
+                dcc.Upload(
+                    id="upload-data",
+                    children=html.Button("Choose CSV", style={'margin': '10px'}),
+                    multiple=False,
+                ),
+                html.Button("Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
+            ],
+            style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
+        )

@@ -123,7 +123,21 @@ app.layout = html.Div([
                     ], style={'marginBottom': '10px'}),
                 ], style={'marginTop': '10px'}),
 
-                html.Div(id="upload-container", style={"textAlign": "center"}),
+                html.Div(
+                    id="upload-container",
+                    style={"textAlign": "center"},
+                    children=html.Div(
+                        [
+                            dcc.Upload(
+                                id="upload-data",
+                                children=html.Button("Choose CSV", style={'margin': '10px'}),
+                                multiple=False,
+                            ),
+                            html.Button("Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
+                        ],
+                        style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
+                    ),
+                ),
 
             ]
         ),

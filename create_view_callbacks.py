@@ -20,13 +20,14 @@ def register_create_view_callbacks(app):
         Output('csv-size-warning', 'displayed'),
         Output('upload-signal', 'data'),
         Input('upload-data', 'contents'),
+        Input('test-dive-button', 'n_clicks'),
         Input('csv-size-warning', 'submit_n_clicks'),
         Input('csv-size-warning', 'cancel_n_clicks'),
         State('pending-csv', 'data'),
         State('upload-signal', 'data'),
         prevent_initial_call=True
     )
-    def gate_and_decide(contents, ok_clicks, cancel_clicks, pending, upload_signal):
+    def gate_and_decide(contents, test_dive_clicks, ok_clicks, cancel_clicks, pending, upload_signal):
         """
         This callback gatekeeps larger csv files. if it is < 100 rows accept immediately, else stash in pending-csv and show dialogue box.
 
@@ -34,6 +35,8 @@ def register_create_view_callbacks(app):
         ----------
         contents : str or None
             base64 encoded string containing uploaded CSV file's content
+        test_dive_clicks : int or None
+            Number of times the "test dive" button has been clicked.
         ok_clicks : int or None
             Number of times the OK button in dialogue box was clicked.
         cancel_clicks : int or None
@@ -55,8 +58,15 @@ def register_create_view_callbacks(app):
         trig = ctx.triggered_id
         upload_signal = upload_signal or 0
 
-        # csv was uploaded -> count lines and decide to show dialogue box
-        if trig == 'upload-data' and contents:
+        # test dive clicked -> load local test.csv
+        if trig == 'test-dive-button' and test_dive_clicks:
+            with open('test.csv', 'rb') as f:
+                raw = f.read()
+            encoded = base64.b64encode(raw).decode('ascii')
+            contents = f"data:text/csv;base64,{encoded}"
+
+        # csv was uploaded or test csv selected -> decode contents
+        if trig in ('upload-data', 'test-dive-button') and contents:
             content_type, content_string = contents.split(',', 1)
             decoded = base64.b64decode(content_string)
             text = decoded.decode('latin-1', errors='ignore')
