@@ -1,4 +1,7 @@
-## Installation
+## Live Demo
+👉 [View the Live Site](https://dive-5u20.onrender.com)
+
+## Local installation
 
 Follow these steps to set up the project in a virtual environment.
 Use 3.13.5 Python
