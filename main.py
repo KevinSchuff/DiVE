@@ -127,7 +127,7 @@ app.layout = html.Div([
                                 children=html.Button("Choose CSV", style={'margin': '10px'}),
                                 multiple=False,
                             ),
-                            html.Button("🚀 Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
+                            html.Button("Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
                         ],
                         style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
                     ),
