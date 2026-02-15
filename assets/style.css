@@ -1,20 +1,137 @@
-body {
-    font-family: "Segoe UI", sans-serif;
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --panel: #ffffff;
+  --border: #e2e6ea;
+  --border-strong: #c9d1d9;
+  --primary: #2582b1;
+  --primary-ink: #ffffff;
+  --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  --radius: 12px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #f6f7f9;
+  font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.app-shell {
+  padding: 12px 16px 16px 16px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+
+.topbar .topbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar {
+  flex: 0 0 380px;
+  max-width: 420px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+}
+
+.cyto-views {
+  flex: 1;
+  margin-left: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.panel-card {
+  background: #fbfcfd;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
 }
 
 button {
-    font: inherit;
-    background-color: #004A6F;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 4px 4px;
+  font-family: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  padding: 6px 10px;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-color: var(--primary);
 }
 
 button:hover {
-    background-color: #0072A6;
+  border-color: #000000;
 }
 
 button:disabled {
-    background-color: darkgrey;
+  background-color: darkgrey;
+  border-color: darkgray;
+}
+
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.overlay-card {
+  background: var(--panel);
+  padding: 20px;
+  max-width: 640px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.btn-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 18px;
+  background: #b15425;
+  border: 1px solid var(--border);
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  line-height: 28px;
+  text-align: center;
+  padding: 0;
 }

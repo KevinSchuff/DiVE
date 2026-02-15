@@ -40,30 +40,13 @@ app.layout = html.Div([
     # starting overlay
     html.Div(
         id='start-app-overlay',
-        style={
-            'position': 'fixed',
-            'inset': 0,
-            'backgroundColor': 'rgba(0,0,0,0.6)',
-            'zIndex': 10000,
-            'display': 'flex',
-            'justifyContent': 'center',
-            'alignItems': 'center',
-            'padding': '24px'
-        },
+        className='overlay-backdrop',
         children=html.Div(
-            style={
-                'backgroundColor': 'white',
-                'padding': '24px',
-                'maxWidth': '600px',
-                'width': '100%',
-                'border': '2px solid black',
-                'borderRadius': '12px',
-                'position': 'relative',
-            },
+            className='overlay-card',
             children=[
                 html.Button(
-                    "✕", id='start-app-overlay-close-btn', n_clicks=0,
-                    style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px', 'fontWeight': 'bold', 'backgroundColor': 'red',}
+                    "X", id='start-app-overlay-close-btn', n_clicks=0,
+                    className='btn-close'
                     ),
                 html.H1("Welcome to DiVE"),
                 html.H3("DieLink Visualization Environment"),
@@ -145,13 +128,14 @@ app.layout = html.Div([
 
     html.Div(
         id="about-overlay",
-        style={"display": "none", "position": "fixed", "inset": 0, "background": "rgba(0,0,0,0.6)",},
+        style={"display": "none"},
+        className="overlay-backdrop",
         children=html.Div(
             [
                 html.Div(
                 [
                     html.H3("About DiVE", style={"margin": 0}),
-                    html.Button("X", id="about-close-btn", n_clicks=0, style={"marginLeft": "auto", 'fontWeight': 'bold', 'backgroundColor': 'red',},),
+                    html.Button("X", id="about-close-btn", n_clicks=0, className="btn-close", style={"marginLeft": "auto"}),
                 ],
                 style={"display": "flex", "alignItems": "center", "marginBottom": "16px",},
             ),
@@ -160,7 +144,8 @@ app.layout = html.Div([
                 html.Div("Latest version and test.csv file on GitHub."),
                 html.A("Open GitHub", href="https://github.com/KevinSchuff/DiVE", target="_blank")
             ],
-            style={"background": "white", "padding": "24px", 'border': '2px solid black','borderRadius': '12px', 'width': '300px'},
+            className="overlay-card",
+            style={'width': '320px'},
         )
     ),
 
@@ -168,18 +153,12 @@ app.layout = html.Div([
     # Lightbox for coin pictures
     html.Div(
         id='lightbox',
-        style={
-            'display': 'none',                      # hidden by default
-            'position': 'fixed', 'inset': 0,
-            'background': 'rgba(0,0,0,0.6)',
-            'zIndex': 9999,
-            'justifyContent': 'center', 'alignItems': 'center',
-            'padding': '24px',
-        },
+        className='overlay-backdrop',
+        style={'display': 'none'},
         children=html.Div([
             html.Button(
-                "✕", id='lightbox-close', n_clicks=0,
-                style={'position': 'absolute', 'top': '20px', 'right': '20px', 'fontSize': '20px', 'fontWeight': 'bold', 'backgroundColor': 'red',}
+                "X", id='lightbox-close', n_clicks=0,
+                className='btn-close'
             ),
             html.Div(id='lightbox-body', style={'position':'relative', 'display':'flex',
                                             'flexDirection':'column', 'alignItems':'center'})
@@ -207,7 +186,7 @@ app.layout = html.Div([
                     value='coins',
                     inline=True
                 ),
-            ], style={"flex": "1", "display": "flex", "justifyContent": "center"}),
+            ], className="topbar-center"),
                         # new csv button
             html.Div(
                 [
@@ -215,9 +194,9 @@ app.layout = html.Div([
                 ], style={"flex":"0 0 auto"},
             ),
         ],
-        style={"display": "flex"}
+        className="topbar"
     ),
-    html.Hr(),
+    html.Div(className="divider"),
 
     # Sidebar and Visualizations
     html.Div([
@@ -249,7 +228,7 @@ app.layout = html.Div([
                 inline=True,
                 style={'marginBottom': '10px'}
             ),
-            html.Hr(),
+            html.Div(className="divider"),
 
             # Edge controls
             html.Div([
@@ -290,7 +269,7 @@ app.layout = html.Div([
             html.Div(
                 id='color-nodes-container',
                 children=[
-                    html.Hr(),
+                    html.Div(className="divider"),
                     html.H3("Color nodes by attribute value"),
                     html.Label("Red:"),
                     dcc.Dropdown(id={'type': 'color-dropdown', 'index': 'red'}, multi=True, searchable=True),
@@ -317,7 +296,7 @@ app.layout = html.Div([
             html.Div(
                 id='hiding-nodes-container',
                 children=[
-                    html.Hr(),
+                    html.Div(className="divider"),
                     html.H3("Hide Nodes"),
                     html.Div(html.Label("by selection:", style={'fontWeight': 'bold'})),
                     html.Div(html.Label("use box selection: shift + left-click + drag"), style={'marginBottom': '4px'}),
@@ -329,8 +308,8 @@ app.layout = html.Div([
                         ],
                         style={
                             'display': 'flex',
-                            'justifyContent': 'space-evenly',
-                            'width': '100%',
+                            'justifyContent': 'center',
+                            'gap': '12px',
                         }
                     ),
                     html.Div(html.Label("by attribute value:", style={'fontWeight': 'bold'}), style={'marginTop': '20px', 'marginBottom': '10px'}),
@@ -339,29 +318,29 @@ app.layout = html.Div([
             ),
 
             # Node Details
-            html.Hr(),
+            html.Div(className="divider"),
             html.H3("Node details"),
             html.Div(id='node-info-box', style={
                 'padding': '10px',
                 'border': '1px solid #ccc',
-                'borderRadius': '4px',
+                'borderRadius': '8px',
                 'maxHeight': '200px',
                 'overflowY': 'auto',
-                'backgroundColor': '#C6E2F7'
+                'backgroundColor': '#fbfcfd'
             }),
 
             # Statistics
-            html.Hr(),
+            html.Div(className="divider"),
             html.H3("Statistics"),
             html.Div(
                 id='stats-box',
                 style={
                     'padding': '10px',
-                    'border': '1px solid #ccc',
-                    'borderRadius': '4px',
+                    'border': '1px solid #e2e6ea',
+                    'borderRadius': '8px',
                     'maxHeight': '160px',
                     'overflowY': 'auto',
-                    'backgroundColor': '#C6E2F7',
+                    'backgroundColor': '#fbfcfd',
                     'marginTop': '6px'
                 }
             ),
@@ -370,13 +349,13 @@ app.layout = html.Div([
             html.Div(
                 id='export-container',
                 children=[
-                    html.Hr(),
+                    html.Div(className="divider"),
                     html.H3("Export"),
                     html.Button("Export as PNG", id='export-png-button', n_clicks=0),
                 ],
             ),
 
-            ], style={'flex': '1', 'padding': '10px', 'maxWidth': '400px', 'overflowY': 'auto'}),
+            ], className="sidebar"),
 
 
         # Visualizations
@@ -402,7 +381,7 @@ app.layout = html.Div([
             boxSelectionEnabled = True,
             wheelSensitivity=0.1,
             ),
-        ], style={'flex': '3', 'height': '100%'})
+        ], className="cyto-views")
     ], style={'display': 'flex', 'flexDirection': 'row', 'height': '95vh'}),
 
     # pop up for csv > 100lines
@@ -416,7 +395,7 @@ app.layout = html.Div([
         ),
         displayed=False
     ),
-])
+], className="app-shell")
 
 register_create_view_callbacks(app)
 register_update_view_callbacks(app)
