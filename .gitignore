@@ -39,3 +39,4 @@ test.csv
 assets/*
 !assets/.gitkeep
 !assets/style.css
+!assets/dive-pic.png

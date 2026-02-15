@@ -43,6 +43,7 @@ app.layout = html.Div([
         className='overlay-backdrop',
         children=html.Div(
             className='overlay-card',
+            style={'textAlign': 'center'},
             children=[
                 html.Button(
                     "X", id='start-app-overlay-close-btn', n_clicks=0,
@@ -50,61 +51,71 @@ app.layout = html.Div([
                     ),
                 html.H1("Welcome to DiVE"),
                 html.H3("DieLink Visualization Environment"),
-                html.P(
-                    [
-                        "DiVE accepts a labeled list of coins as a .csv file.",
-                        html.Br(),
-                        "Each row represents one coin with die assignments and optional image URLs",
-                        html.Br(),
-                        "Rename or enter the relevant column names below.",
-                        html.Br(),
-                        "Then select the .csv file.",
-                    ]
-                ),
+                html.H4("DiVE transforms labeled coin lists into interactive visualizations."),
+                html.Img(src="/assets/dive-pic.png", style={"width": "400px"}),
+                html.P(["*Coin pictures from ", html.A("https://www.corpus-nummorum.eu/", href="https://www.corpus-nummorum.eu/", target="_blank"),"."],
+                    style={"fontSize": "12px"}),
 
-                # User Inputs for Column names
-                html.Div([
-                    html.Div([
-                        html.Label("front die column:"),
-                        dcc.Input(
-                            id='front-column',
-                            type='text',
-                            placeholder='Rename related column name to "front die" or enter it here.',
-                            debounce=True,
-                            style={'width': '100%'}
+                html.Div(
+                    style={'textAlign': 'left'},
+                    children=[
+                        html.P(
+                            [
+                                "DiVE accepts a labeled list of coins as a .csv file.",
+                                html.Br(),
+                                "Each row represents one coin with die assignments and optional image URLs",
+                                html.Br(),
+                                "Rename or enter the relevant column names below.",
+                                html.Br(),
+                                "Then select the .csv file.",
+                            ]
                         ),
-                    ], style={'marginBottom': '10px'}),
-                    html.Div([
-                        html.Label("back die column:"),
-                        dcc.Input(
-                            id='back-column',
-                            type='text',
-                            placeholder='Rename related column name to "back die" or enter it here.',
-                            debounce=True,
-                            style={'width': '100%'}
-                        ),
-                    ], style={'marginBottom': '10px'}),
-                    html.Div([
-                        html.Label("front image column:"),
-                        dcc.Input(
-                            id='front-url-column',
-                            type='text',
-                            placeholder='Rename related column name to "front img" or enter it here.',
-                            debounce=True,
-                            style={'width': '100%'}
-                        ),
-                    ], style={'marginBottom': '10px'}),
-                    html.Div([
-                        html.Label("back image column:"),
-                        dcc.Input(
-                            id='back-url-column',
-                            type='text',
-                            placeholder='Rename related column name to "back img" or enter it here.',
-                            debounce=True,
-                            style={'width': '100%'}
-                        ),
-                    ], style={'marginBottom': '10px'}),
-                ], style={'marginTop': '10px'}),
+
+                        # User Inputs for Column names
+                        html.Div([
+                            html.Div([
+                                html.Label("front die column:"),
+                                dcc.Input(
+                                    id='front-column',
+                                    type='text',
+                                    placeholder='Rename related column name to "front die" or enter it here.',
+                                    debounce=True,
+                                    style={'width': '100%'}
+                                ),
+                            ], style={'marginBottom': '10px'}),
+                            html.Div([
+                                html.Label("back die column:"),
+                                dcc.Input(
+                                    id='back-column',
+                                    type='text',
+                                    placeholder='Rename related column name to "back die" or enter it here.',
+                                    debounce=True,
+                                    style={'width': '100%'}
+                                ),
+                            ], style={'marginBottom': '10px'}),
+                            html.Div([
+                                html.Label("front image column:"),
+                                dcc.Input(
+                                    id='front-url-column',
+                                    type='text',
+                                    placeholder='Rename related column name to "front img" or enter it here.',
+                                    debounce=True,
+                                    style={'width': '100%'}
+                                ),
+                            ], style={'marginBottom': '10px'}),
+                            html.Div([
+                                html.Label("back image column:"),
+                                dcc.Input(
+                                    id='back-url-column',
+                                    type='text',
+                                    placeholder='Rename related column name to "back img" or enter it here.',
+                                    debounce=True,
+                                    style={'width': '100%'}
+                                ),
+                            ], style={'marginBottom': '10px'}),
+                        ], style={'marginTop': '10px'}),
+                    ],
+                ),
 
                 html.Div(
                     id="upload-container",
@@ -116,7 +127,7 @@ app.layout = html.Div([
                                 children=html.Button("Choose CSV", style={'margin': '10px'}),
                                 multiple=False,
                             ),
-                            html.Button("Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
+                            html.Button("🚀 Test DiVE", id="test-dive-button", n_clicks=0, style={'margin': '10px'}),
                         ],
                         style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
                     ),
@@ -382,7 +393,7 @@ app.layout = html.Div([
             wheelSensitivity=0.1,
             ),
         ], className="cyto-views")
-    ], style={'display': 'flex', 'flexDirection': 'row', 'height': '95vh'}),
+    ], style={'display': 'flex', 'flexDirection': 'row', 'height': '87vh'}),
 
     # pop up for csv > 100lines
     dcc.ConfirmDialog(
