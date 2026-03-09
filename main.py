@@ -152,11 +152,19 @@ app.layout = html.Div([
             ),
                 html.Div("Version: 1.0"),
                 html.Div("Author: Kevin Schuff"),
-                html.Div("Latest version and test.csv file on GitHub."),
-                html.A("Open GitHub", href="https://github.com/KevinSchuff/DiVE", target="_blank")
+                html.Div([
+                    html.Div([
+                        "Latest version and test.csv file on ",
+                        html.A("GitHub", href="https://github.com/KevinSchuff/DiVE", target="_blank")
+                    ]),
+                    html.Div([
+                        "For feedback, please contact ",
+                        html.A("dive-feedback@proton.me", href="mailto:dive-feedback@proton.me")
+                    ])
+                ])
             ],
             className="overlay-card",
-            style={'width': '320px'},
+            style={'width': '400px'},
         )
     ),
 
